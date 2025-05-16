@@ -1,3 +1,4 @@
+// This is the corrected code for MusicChatbot.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Music, BookOpen, Users } from "lucide-react";
 
@@ -36,24 +37,7 @@ interface ChatHistoryMessage {
   created_at: string;
 }
 
-// Fallback responses in case API fails
-const fallbackResponses = {
-  fun: [
-    "🎵 Let's have some fun with music! Have you heard the latest pop hit?",
-    "Did you know that the world's longest concert lasted for 639 hours? Now that's what I call an encore!",
-    "Music fun fact: The most expensive musical instrument ever sold was a Stradivarius violin for $16 million!",
-  ],
-  mentor: [
-    "Looking at the chord progression you mentioned, try adding a seventh to create more tension before resolution.",
-    "When practicing scales, focus on consistency of tone rather than speed initially.",
-    "The technique you're describing is called 'palm muting' - it's essential for controlling dynamics in guitar playing.",
-  ],
-  buddy: [
-    "I'm here to support your musical journey. What are you working on today?",
-    "It's totally normal to hit plateaus in your practice. Let's figure out what might help you break through.",
-    "Your progress has been impressive! Remember where you were just a few months ago?",
-  ],
-};
+// Removed the unused fallbackResponses variable
 
 interface MusicChatbotProps {
   initialUserMessage?: string;
@@ -76,7 +60,8 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   const [displayedContents, setDisplayedContents] = useState<
     Record<string, string>
   >({});
-  const [loading, setLoading] = useState(false);
+  // Fix 1: Only keep the setter function for loading
+  const setLoading = useState(false)[1];
 
   // Add a flag to track which messages have been sent to the API
   const [processedMessages, setProcessedMessages] = useState<
@@ -98,8 +83,10 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
   // Use TanStack Query mutations and queries
   const sendMessageMutation = useSendMessage();
-  const { data: sessionDataFromQuery = [], isLoading: loadingSession } =
-    useSessionData(propSessionId || sessionId);
+  // Fix 2: Remove the unused loadingSession variable
+  const { data: sessionDataFromQuery = [] } = useSessionData(
+    propSessionId || sessionId
+  );
 
   // Process sessionData if provided
   useEffect(() => {

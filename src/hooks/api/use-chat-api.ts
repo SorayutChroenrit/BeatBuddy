@@ -44,7 +44,7 @@ export const useSendMessage = () => {
       const response = await apiClient.post("/ask", data);
       return response.data;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate chat history queries
       queryClient.invalidateQueries({ queryKey: ["chat-history"] });
       queryClient.invalidateQueries({
