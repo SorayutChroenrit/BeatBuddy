@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
 
-const API_URL = process.env.VITE_BACKEND_URL;
+const API_URL = import.meta.env.VITE_BACKEND_URL;
 console.log("API URL from env:", import.meta.env.VITE_BACKEND_URL);
 
 const api = axios.create({
