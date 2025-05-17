@@ -16,6 +16,8 @@ const HomePage: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Add loading state to prevent multiple submissions
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Add a ref to prevent multiple submissions during navigation
+  const isNavigatingRef = useRef(false);
 
   // Focus input when component loads
   useEffect(() => {
@@ -24,35 +26,67 @@ const HomePage: React.FC = () => {
     }
   }, []);
 
-  // Improved request handler with proper submission protection
+  // Improved request handler with better submission protection
   const handleStartChat = () => {
-    if (initialMessage.trim() !== "" && !isSubmitting) {
-      // Set submitting flag immediately to prevent duplicate requests
-      setIsSubmitting(true);
+    // Double-check we're not already submitting or navigating
+    if (
+      initialMessage.trim() === "" ||
+      isSubmitting ||
+      isNavigatingRef.current
+    ) {
+      return;
+    }
 
-      // Generate session ID
+    // Set both state and ref to prevent any possibility of double submissions
+    setIsSubmitting(true);
+    isNavigatingRef.current = true;
+
+    // Generate session ID only once
+    const newSessionId = uuidv4();
+
+    // Store initial message and mode in localStorage
+    localStorage.setItem(
+      `chat_initial_message_${newSessionId}`,
+      initialMessage
+    );
+    localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
+
+    // Navigate directly to chat page without any setTimeout
+    navigate(`/chat/${newSessionId}`);
+  };
+
+  // Separate handler for keyboard submission to avoid conflicts
+  const handleKeyboardSubmit = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+
+      // Double-check we're not already submitting or navigating
+      if (
+        initialMessage.trim() === "" ||
+        isSubmitting ||
+        isNavigatingRef.current
+      ) {
+        return;
+      }
+
+      // Set both state and ref to prevent any possibility of double submissions
+      setIsSubmitting(true);
+      isNavigatingRef.current = true;
+
+      // Generate new session ID
       const newSessionId = uuidv4();
 
-      // Store initial message and mode in localStorage
+      // Store data in localStorage
       localStorage.setItem(
         `chat_initial_message_${newSessionId}`,
         initialMessage
       );
       localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
 
-      // Navigate to chat page directly without setTimeout
+      // Navigate without delay
       navigate(`/chat/${newSessionId}`);
-    } else {
-      // Focus input if empty
-      inputRef.current?.focus();
-    }
-  };
-
-  // Improved key press handler
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleStartChat();
     }
   };
 
@@ -68,15 +102,17 @@ const HomePage: React.FC = () => {
 
   const handleSessionSelect = (sessionId: string) => {
     // Prevent multiple clicks during navigation
-    if (!isSubmitting) {
+    if (!isSubmitting && !isNavigatingRef.current) {
       setIsSubmitting(true);
+      isNavigatingRef.current = true;
       navigate(`/chat/${sessionId}`);
     }
   };
 
   const handleNewChat = () => {
     setInitialMessage("");
-    setIsSubmitting(false); // Reset submission state
+    setIsSubmitting(false);
+    isNavigatingRef.current = false;
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
@@ -151,7 +187,7 @@ const HomePage: React.FC = () => {
                 ref={inputRef}
                 value={initialMessage}
                 onChange={(e) => setInitialMessage(e.target.value)}
-                onKeyDown={handleKeyPress}
+                onKeyDown={handleKeyboardSubmit}
                 placeholder="Ask about music, theory, or get recommendations..."
                 className="min-h-20 resize-none text-lg mb-4 p-4"
                 rows={3}
