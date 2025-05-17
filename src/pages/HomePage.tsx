@@ -32,7 +32,7 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // CRITICAL FIX: Separate handler for button click and actual chat initiation
+  // Separate handler for button click and actual chat initiation
   const handleStartChat = () => {
     // Check for empty message or already in progress
     if (
@@ -50,7 +50,6 @@ const HomePage: React.FC = () => {
     // Generate a session ID
     const newSessionId = uuidv4();
 
-    // Debug log
     console.log(
       `Starting chat with message: "${initialMessage}" and mode: ${currentMode}`
     );

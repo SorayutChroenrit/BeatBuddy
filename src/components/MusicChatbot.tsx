@@ -61,24 +61,18 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   const [imageError, setImageError] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  // New state to properly track if the initial message has been processed
   const [initialMessageProcessed, setInitialMessageProcessed] = useState(false);
   const [initialGreetingShown, setInitialGreetingShown] = useState(false);
-
-  // CRITICAL FIX: Track API call in progress separately from typing indicator
   const [apiCallInProgress, setApiCallInProgress] = useState(false);
-
-  // For debugging
+  const isMountedRef = useRef(true);
   const lastSentMessageRef = useRef("");
+  const apiCallAttemptsRef = useRef(0);
 
   // Generate a session ID for this chat
   const [sessionId, setSessionId] = useState<string>(propSessionId || uuidv4());
-
   const [userId] = useState<string>(() => {
     return user?.id || "anonymous";
   });
-
-  // Chat history state
   const [selectedSessionId, setSelectedSessionId] = useState<string>(sessionId);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -90,12 +84,19 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     propSessionId || sessionId
   );
 
+  // Track component lifecycle
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Process Google avatar URL with cache buster to avoid CORS issues
   useEffect(() => {
     if (user?.image) {
-      // For Google URLs, handle them differently due to Chrome CORS caching issues
       if (user.image.includes("googleusercontent.com")) {
-        // Add a cache-busting parameter to force Chrome to make a new request
         const cacheBuster = `?not-from-cache-please=${Date.now()}`;
         const googleImageUrl = `${user.image}${cacheBuster}`;
         setImageUrl(googleImageUrl);
@@ -125,20 +126,21 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     setImageError(true);
   };
 
-  // Clear all state when props change (for proper resets)
+  // Reset state when sessionId changes
   useEffect(() => {
     if (propSessionId) {
       setSessionId(propSessionId);
       setSelectedSessionId(propSessionId);
 
-      // IMPORTANT FIX: Reset these states whenever the session ID changes
+      // Reset message processing state
       setInitialMessageProcessed(false);
+      lastSentMessageRef.current = "";
+      apiCallAttemptsRef.current = 0;
     }
   }, [propSessionId]);
 
-  // Show initial greeting ONLY if no session data and not already shown
+  // Show initial greeting
   useEffect(() => {
-    // Only set initial greeting if no sessionData was provided and not already shown
     if (
       sessionData.length === 0 &&
       sessionDataFromQuery.length === 0 &&
@@ -151,13 +153,11 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           "👋 Hi there! I'm your music companion. How can I help you today?",
         sender: "bot",
         timestamp: new Date(),
-        complete: true, // Initial greeting is always complete
+        complete: true,
       };
 
       setMessages([initialMessage]);
       setInitialGreetingShown(true);
-
-      // Initialize displayed content for initial message
       setDisplayedContents((prev) => ({
         ...prev,
         [initialMessage.id]: initialMessage.content,
@@ -170,58 +170,119 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     messages.length,
   ]);
 
-  // CRITICAL FIX: Handle initial user message properly
+  // CRITICAL FIX: Direct handler for initial message
   useEffect(() => {
-    // Print debug info
-    console.log("Initial message effect running", {
-      initialUserMessage,
-      processed: initialMessageProcessed,
-      messagesLength: messages.length,
-      apiInProgress: apiCallInProgress,
-    });
-
-    // Check if there's an initial message to process AND it hasn't been processed yet AND no API call is in progress
-    if (
-      initialUserMessage &&
-      initialUserMessage.trim() !== "" &&
-      !initialMessageProcessed &&
-      !apiCallInProgress
-    ) {
-      // Mark as processed immediately to prevent duplicates
-      setInitialMessageProcessed(true);
-
-      console.log("Processing initial user message:", initialUserMessage);
-      lastSentMessageRef.current = initialUserMessage;
-
-      // First, always show the user's message
-      const userMessageId = `initial-user-${Date.now()}`;
-      const userMessage: Message = {
-        id: userMessageId,
-        content: initialUserMessage,
-        sender: "user",
-        timestamp: new Date(),
-        complete: true, // User messages are always complete
-      };
-
-      // Add the user message immediately
-      setMessages((prevMessages) => [...prevMessages, userMessage]);
-
-      // Use a slight delay to make it feel more natural and ensure the UI has updated
-      const timer = setTimeout(() => {
-        // Directly call the message sending function with explicit props
-        sendMessageToAPI(
-          initialUserMessage,
-          currentMode,
-          selectedSessionId || sessionId,
-          user?.id || userId
+    const handleInitialMessage = async () => {
+      if (
+        isMountedRef.current &&
+        initialUserMessage &&
+        initialUserMessage.trim() !== "" &&
+        !initialMessageProcessed &&
+        !apiCallInProgress
+      ) {
+        console.log(
+          "DIRECT HANDLER: Processing initial message:",
+          initialUserMessage
         );
-      }, 300);
 
-      return () => clearTimeout(timer);
-    }
-  }, [initialUserMessage, initialMessageProcessed, apiCallInProgress]);
+        // Mark as processed
+        setInitialMessageProcessed(true);
+        lastSentMessageRef.current = initialUserMessage;
 
-  // Process sessionData if provided - completely separate effect
+        // First, add user message to chat
+        const userMessageId = `initial-user-${Date.now()}`;
+        const userMessage: Message = {
+          id: userMessageId,
+          content: initialUserMessage,
+          sender: "user",
+          timestamp: new Date(),
+          complete: true,
+        };
+
+        setMessages((prev) => [...prev, userMessage]);
+
+        // Then directly make API call
+        try {
+          setIsTyping(true);
+          setApiCallInProgress(true);
+
+          console.log("DIRECT API CALL with:", {
+            message: initialUserMessage,
+            mode: currentMode,
+            sessionId: selectedSessionId || sessionId,
+            userId: user?.id || userId,
+          });
+
+          apiCallAttemptsRef.current += 1;
+
+          const response = await sendMessageMutation.mutateAsync({
+            question: initialUserMessage,
+            mode: currentMode,
+            session_id: selectedSessionId || sessionId,
+            user_id: user?.id || userId,
+          });
+
+          if (isMountedRef.current) {
+            console.log("DIRECT API SUCCESS:", response);
+
+            // Add bot response
+            const botMessageId = `bot-direct-${Date.now()}`;
+            const botMessage: Message = {
+              id: botMessageId,
+              content: response.response,
+              sender: "bot",
+              timestamp: new Date(),
+              complete: false,
+            };
+
+            setMessages((prev) => [...prev, botMessage]);
+            setDisplayedContents((prev) => ({
+              ...prev,
+              [botMessageId]: "",
+            }));
+          }
+        } catch (error) {
+          console.error("DIRECT API ERROR:", error);
+
+          if (isMountedRef.current) {
+            // Add error message
+            const errorMessageId = `error-direct-${Date.now()}`;
+            const errorMessage: Message = {
+              id: errorMessageId,
+              content:
+                "Sorry, I encountered an error processing your request. Please try again.",
+              sender: "bot",
+              timestamp: new Date(),
+              complete: true,
+            };
+
+            setMessages((prev) => [...prev, errorMessage]);
+            setDisplayedContents((prev) => ({
+              ...prev,
+              [errorMessageId]: errorMessage.content,
+            }));
+          }
+        } finally {
+          if (isMountedRef.current) {
+            setIsTyping(false);
+            setApiCallInProgress(false);
+          }
+        }
+      }
+    };
+
+    // Execute handler when initial message changes
+    handleInitialMessage();
+  }, [
+    initialUserMessage,
+    currentMode,
+    selectedSessionId,
+    sessionId,
+    user?.id,
+    userId,
+  ]);
+
+  // Process session data
   useEffect(() => {
     if (
       (sessionDataFromQuery && sessionDataFromQuery.length > 0) ||
@@ -242,33 +303,26 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
     try {
       console.log("Processing session data for ID:", id);
-
-      // Use either provided sessionData or data from query
       const data = sessionData.length > 0 ? sessionData : sessionDataFromQuery;
 
       if (Array.isArray(data) && data.length > 0) {
-        // Sort by created_at to get the chronological order
         const sortedData = [...data].sort(
           (a, b) =>
             new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
 
-        // Check if there's an ongoing request (query without response)
         const hasOngoingRequest = sortedData.some(
           (msg) => msg.query && (!msg.response || msg.response === "")
         );
 
-        // Set current mode from the most recent message
         const latestMode = sortedData[sortedData.length - 1]?.mode;
         if (latestMode && ["fun", "mentor", "buddy"].includes(latestMode)) {
           setCurrentMode(latestMode as "fun" | "mentor" | "buddy");
         }
 
-        // Process and format messages for display
         const formattedMessages: Message[] = [];
         const newDisplayedContents: Record<string, string> = {};
 
-        // Add initial greeting message only if no messages exist yet
         if (formattedMessages.length === 0) {
           const initialMessageId = "initial";
           const initialMessage = {
@@ -283,20 +337,15 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           newDisplayedContents[initialMessageId] = initialMessage.content;
         }
 
-        // Set flag to prevent processing initialUserMessage again
         setInitialMessageProcessed(true);
-
-        // Track which messages we've processed to avoid duplicates
         const processedQueries = new Set();
 
         sortedData.forEach((item, index) => {
-          // Prevent duplicate messages by checking if we've seen this query before
           if (processedQueries.has(item.query)) {
             return;
           }
           processedQueries.add(item.query);
 
-          // Add user message (query)
           const userMsgId = `history-user-${index}`;
           const userMsg = {
             id: userMsgId,
@@ -307,7 +356,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           };
           formattedMessages.push(userMsg);
 
-          // Add bot message (response) if it exists and is not empty
           if (item.response && item.response.trim() !== "") {
             const botMsgId = `history-bot-${index}`;
             const botMsg = {
@@ -325,7 +373,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         setMessages(formattedMessages);
         setDisplayedContents(newDisplayedContents);
 
-        // If there's an ongoing request, set typing to true to show the loading dots
         if (hasOngoingRequest) {
           setIsTyping(true);
         }
@@ -337,7 +384,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
-  // CRITICAL FIX: Direct function for sending to API to avoid hooks issues
+  // CRITICAL FIX: Direct function for sending messages to API
   const sendMessageToAPI = async (
     message: string,
     mode: BotMode,
@@ -349,11 +396,11 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       return;
     }
 
-    // Set both flags for UI feedback
     setIsTyping(true);
     setApiCallInProgress(true);
+    apiCallAttemptsRef.current += 1;
     console.log(
-      `Sending message to API: "${message}" with mode: ${mode}, session: ${session}`
+      `Sending message to API: "${message}" with mode: ${mode}, session: ${session}, attempt: ${apiCallAttemptsRef.current}`
     );
 
     try {
@@ -373,7 +420,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         content: response.response,
         sender: "bot",
         timestamp: new Date(),
-        complete: false, // Start with typing effect
+        complete: false,
       };
 
       setMessages((prevMessages) => [...prevMessages, botMessage]);
@@ -384,7 +431,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     } catch (error) {
       console.error(`Error in chat flow for message "${message}":`, error);
 
-      // Add error message
       const errorMessageId = `error-${Date.now()}`;
       const errorMessage: Message = {
         id: errorMessageId,
@@ -406,7 +452,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
-  // Handle send message (UI wrapper for sendMessageToAPI)
+  // Handle UI send message
   const handleSendMessage = async (customMessage?: string) => {
     const messageToSend = customMessage || inputValue;
     if (messageToSend.trim() === "" || isTyping || apiCallInProgress) return;
@@ -414,7 +460,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     const messageId = `msg-${Date.now()}`;
     const userMessageId = `user-${messageId}`;
 
-    // Check for recent duplicate messages to prevent double-sends
+    // Check for duplicates
     const isDuplicate = messages.some(
       (msg) =>
         msg.sender === "user" &&
@@ -422,24 +468,14 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         Date.now() - msg.timestamp.getTime() < 5000
     );
 
-    // Also check against the last sent message (esp. for initial message)
-    if (messageToSend === lastSentMessageRef.current) {
-      console.log(
-        "Duplicate of last sent message detected, ignoring:",
-        messageToSend
-      );
-      return;
-    }
-
-    if (isDuplicate) {
+    if (messageToSend === lastSentMessageRef.current || isDuplicate) {
       console.log("Duplicate message detected, ignoring:", messageToSend);
       return;
     }
 
-    // Store last sent message for duplicate checking
     lastSentMessageRef.current = messageToSend;
 
-    // Add user message if it's from direct input (not initial message)
+    // Add user message if not already shown
     if (
       !customMessage ||
       !messages.some(
@@ -457,10 +493,10 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       setMessages((prevMessages) => [...prevMessages, userMessage]);
     }
 
-    // Clear input field if this is a direct user input
+    // Clear input field
     if (!customMessage) setInputValue("");
 
-    // Send the message to the API
+    // Send to API
     sendMessageToAPI(
       messageToSend,
       currentMode,
@@ -469,7 +505,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
   };
 
-  // Typing effect useEffect
+  // Typing effect
   useEffect(() => {
     // Find the latest bot message that isn't complete
     const incompleteMessage = messages.find(
