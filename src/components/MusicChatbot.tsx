@@ -67,6 +67,9 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     Record<string, boolean>
   >({});
 
+  // Added to prevent duplicate initial message processing
+  const initialMessageProcessedRef = useRef(false);
+
   // Generate a session ID for this chat
   const [sessionId, setSessionId] = useState<string>(propSessionId || uuidv4());
 
@@ -153,6 +156,14 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
     // Check if there's an initial message to process
     if (initialUserMessage && initialUserMessage.trim() !== "") {
+      // Check if we've already processed the initial message
+      if (initialMessageProcessedRef.current) {
+        return; // Skip processing if already done
+      }
+
+      // Mark as processed immediately to prevent double processing
+      initialMessageProcessedRef.current = true;
+
       // First, always show the user's message
       const userMessageId = `initial-user-${Date.now()}`;
       const userMessage: Message = {
