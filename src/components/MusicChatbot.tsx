@@ -1,4 +1,3 @@
-// This is the corrected code for MusicChatbot.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Music, BookOpen, Users } from "lucide-react";
 
@@ -7,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { useAuth } from "../lib/auth";
 import { useSendMessage, useSessionData } from "../hooks/api/use-chat-api";
 import { Badge } from "./ui/badge";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Card } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
@@ -22,7 +21,7 @@ interface Message {
   content: string;
   sender: "user" | "bot";
   timestamp: Date;
-  complete?: boolean; // Track if the message is fully displayed
+  complete?: boolean;
 }
 
 // Chat history message from API
@@ -36,8 +35,6 @@ interface ChatHistoryMessage {
   intent: string;
   created_at: string;
 }
-
-// Removed the unused fallbackResponses variable
 
 interface MusicChatbotProps {
   initialUserMessage?: string;
@@ -62,6 +59,8 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   >({});
   // Fix 1: Only keep the setter function for loading
   const setLoading = useState(false)[1];
+  const [imageError, setImageError] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   // Add a flag to track which messages have been sent to the API
   const [processedMessages, setProcessedMessages] = useState<
@@ -87,6 +86,41 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   const { data: sessionDataFromQuery = [] } = useSessionData(
     propSessionId || sessionId
   );
+
+  // Process Google avatar URL with cache buster to avoid CORS issues
+  useEffect(() => {
+    if (user?.image) {
+      // For Google URLs, handle them differently due to Chrome CORS caching issues
+      if (user.image.includes("googleusercontent.com")) {
+        // Add a cache-busting parameter to force Chrome to make a new request
+        const cacheBuster = `?not-from-cache-please=${Date.now()}`;
+        const googleImageUrl = `${user.image}${cacheBuster}`;
+        setImageUrl(googleImageUrl);
+      } else {
+        setImageUrl(user.image);
+      }
+    } else {
+      setImageUrl(null);
+    }
+  }, [user]);
+
+  // Get initials for avatar
+  const getInitials = () => {
+    if (!user?.name) return "U";
+    const nameParts = user.name.split(" ");
+    if (nameParts.length >= 2) {
+      return `${nameParts[0][0]}${
+        nameParts[nameParts.length - 1][0]
+      }`.toUpperCase();
+    }
+    return nameParts[0].substring(0, 2).toUpperCase();
+  };
+
+  // Handle image error
+  const handleImageError = () => {
+    console.error("Failed to load image:", imageUrl);
+    setImageError(true);
+  };
 
   // Process sessionData if provided
   useEffect(() => {
@@ -399,12 +433,15 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
+  // Check if we should show the image or fallback
+  const shouldShowFallback = imageError || !imageUrl;
+
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* Chat Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Header - Fixed at top */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sticky top-0 z-10">
+        <header className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {getModeIcon(currentMode)}
@@ -513,7 +550,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
                               if (isInline) {
                                 return (
                                   <code
-                                    className="bg-gray-100 dark:bg-gray-800 px-1 py-0 rounded text-xs font-mono"
+                                    className="bg-gray-100 px-1 py-0 rounded text-xs font-mono"
                                     {...props}
                                   >
                                     {children}
@@ -521,7 +558,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
                                 );
                               }
                               return (
-                                <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded-md m-0 overflow-x-auto">
+                                <pre className="bg-gray-100 p-1 rounded-md m-0 overflow-x-auto">
                                   <code
                                     className="text-xs font-mono"
                                     {...props}
@@ -560,15 +597,12 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
                               </div>
                             ),
                             thead: ({ node, ...props }) => (
-                              <thead
-                                className="bg-gray-100 dark:bg-gray-800"
-                                {...props}
-                              />
+                              <thead className="bg-gray-100" {...props} />
                             ),
                             tbody: ({ node, ...props }) => <tbody {...props} />,
                             tr: ({ node, ...props }) => (
                               <tr
-                                className="border-b border-gray-200 dark:border-gray-700"
+                                className="border-b border-gray-200"
                                 {...props}
                               />
                             ),
@@ -584,10 +618,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
                             // Horizontal rule with NO spacing
                             hr: ({ node, ...props }) => (
-                              <hr
-                                className="m-0 border-gray-200 dark:border-gray-700"
-                                {...props}
-                              />
+                              <hr className="m-0 border-gray-200" {...props} />
                             ),
                           }}
                         >
@@ -615,8 +646,16 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
                   {message.sender === "user" && (
                     <Avatar className="h-8 w-8 flex-shrink-0">
-                      <AvatarFallback className="bg-indigo-100">
-                        U
+                      {!shouldShowFallback ? (
+                        <AvatarImage
+                          src={imageUrl}
+                          alt={user?.name || "User"}
+                          onError={handleImageError}
+                          crossOrigin="anonymous"
+                        />
+                      ) : null}
+                      <AvatarFallback className="bg-indigo-100 text-indigo-700">
+                        {getInitials()}
                       </AvatarFallback>
                     </Avatar>
                   )}
@@ -657,7 +696,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         </ScrollArea>
 
         {/* Input Area - Fixed at bottom */}
-        <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 z-10">
+        <div className="p-4 bg-white border-t border-gray-200 sticky bottom-0 z-10">
           <div className="flex gap-2">
             <Textarea
               ref={inputRef}

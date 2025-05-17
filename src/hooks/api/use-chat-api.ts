@@ -59,8 +59,9 @@ export const useChatHistory = (userId: string) => {
   return useQuery({
     queryKey: ["chat-history", userId],
     queryFn: async () => {
-      const response = await apiClient.get(`/chat-history/${userId}`);
-      return response.data as ChatMessage[];
+      const response = await apiClient.get(`/chat-history/user/${userId}`);
+      // Access the messages array from the response
+      return response.data.messages as ChatMessage[];
     },
     enabled: !!userId,
   });
@@ -74,7 +75,8 @@ export const useSessionData = (sessionId: string) => {
       const response = await apiClient.get(
         `/chat-history/session/${sessionId}`
       );
-      return response.data as ChatMessage[];
+      // Access the messages array from the response
+      return response.data.messages as ChatMessage[];
     },
     enabled: !!sessionId,
   });

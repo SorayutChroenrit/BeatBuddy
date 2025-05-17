@@ -1,5 +1,5 @@
 import { ChevronDown, LogOut, Settings } from "lucide-react";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,9 +10,37 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { useAuth } from "../lib/auth";
+import { useState, useEffect } from "react";
 
 const UserDropdown = () => {
   const { user, signOut } = useAuth();
+  const [imageError, setImageError] = useState(false);
+  // Fix: Properly type the imageUrl state as string | null
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Reset states when user changes
+    setImageError(false);
+
+    if (user?.image) {
+      console.log("Original image URL:", user.image);
+
+      // For Google URLs, handle them differently due to Chrome CORS caching issues
+      if (user.image.includes("googleusercontent.com")) {
+        // Add a cache-busting parameter to force Chrome to make a new request
+        // This avoids the CORS error that happens when Chrome tries to reuse a cached image
+        const cacheBuster = `?not-from-cache-please=${Date.now()}`;
+        const googleImageUrl = `${user.image}${cacheBuster}`;
+        console.log("Modified image URL with cache buster:", googleImageUrl);
+        setImageUrl(googleImageUrl);
+      } else {
+        // For non-Google URLs, use as is
+        setImageUrl(user.image);
+      }
+    } else {
+      setImageUrl(null);
+    }
+  }, [user]);
 
   if (!user) return null;
 
@@ -28,7 +56,7 @@ const UserDropdown = () => {
     return nameParts[0].substring(0, 2).toUpperCase();
   };
 
-  // Extract first and last name for display
+  // Extract name for display
   const getUserName = () => {
     return user.name || "User";
   };
@@ -41,11 +69,24 @@ const UserDropdown = () => {
     }
   };
 
+  const handleImageError = () => {
+    console.error("Failed to load image in component:", imageUrl);
+    setImageError(true);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 p-2 rounded-md w-full transition-colors hover:bg-gray-50">
           <Avatar className="h-8 w-8">
+            {imageUrl && !imageError ? (
+              <AvatarImage
+                src={imageUrl}
+                alt={getUserName()}
+                onError={handleImageError}
+                crossOrigin="anonymous"
+              />
+            ) : null}
             <AvatarFallback className="bg-indigo-100 text-indigo-700">
               {getInitials()}
             </AvatarFallback>
@@ -61,9 +102,7 @@ const UserDropdown = () => {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{getUserName()}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
-            </p>
+            <p className="text-xs leading-none text-gray-500">{user.email}</p>
           </div>
         </DropdownMenuLabel>
 
@@ -73,6 +112,14 @@ const UserDropdown = () => {
           <DropdownMenuItem>
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
+                {imageUrl && !imageError ? (
+                  <AvatarImage
+                    src={imageUrl}
+                    alt={getUserName()}
+                    onError={handleImageError}
+                    crossOrigin="anonymous"
+                  />
+                ) : null}
                 <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs">
                   {getInitials()}
                 </AvatarFallback>

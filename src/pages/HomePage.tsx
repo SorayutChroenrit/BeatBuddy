@@ -86,7 +86,7 @@ const HomePage: React.FC = () => {
   }) => (
     <button onClick={onClick} className="text-left w-full focus:outline-none">
       <div
-        className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm transition-colors ${
+        className={`bg-white p-4 rounded-lg shadow-sm transition-colors ${
           currentMode === mode
             ? `ring-2 ${colorClasses}`
             : `hover:ring-1 hover:${colorClasses.replace("ring-", "ring-")}`
@@ -100,7 +100,7 @@ const HomePage: React.FC = () => {
         >
           {title}
         </h3>
-        <p className="text-gray-600 dark:text-gray-300">{description}</p>
+        <p className="text-gray-600">{description}</p>
       </div>
     </button>
   );
@@ -114,7 +114,7 @@ const HomePage: React.FC = () => {
         onNewChat={handleNewChat}
       />
       <div className="flex-1 overflow-auto">
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-gray-100 to-gray-200 p-4">
           <div className="max-w-2xl w-full flex flex-col items-center">
             {/* Logo and Title */}
             <div className="flex items-center gap-3 mb-8">
@@ -130,13 +130,13 @@ const HomePage: React.FC = () => {
               your music today?
             </h2>
 
-            <p className="text-lg text-gray-600 dark:text-gray-300 text-center mb-8">
+            <p className="text-lg text-gray-600 text-center mb-8">
               Your AI music companion for recommendations, practice advice, and
               fun facts
             </p>
 
             {/* Input Box */}
-            <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+            <div className="w-full bg-white rounded-lg shadow-md p-6 mb-6">
               <Textarea
                 ref={inputRef}
                 value={initialMessage}

@@ -5,7 +5,6 @@ import {
   MessageSquare,
   BookOpen,
   Users,
-  RefreshCw,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
@@ -43,11 +42,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { user } = useAuth();
 
   // Use TanStack Query instead of manual fetching
-  const {
-    data: chatHistoryData = [],
-    isLoading: isLoadingHistory,
-    refetch: refetchChatHistory,
-  } = useChatHistory(user?.id || "");
+  const { data: chatHistoryData = [], isLoading: isLoadingHistory } =
+    useChatHistory(user?.id || "");
 
   // Helper function to format session title from date
   const formatSessionTitle = (date: Date): string => {
@@ -138,11 +134,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // Manual refresh button handler
-  const handleManualRefresh = () => {
-    refetchChatHistory();
-  };
-
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-full overflow-y-auto flex-shrink-0 flex flex-col">
       {/* Main Content Area */}
@@ -159,7 +150,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex flex-col space-y-6 flex-grow">
           <Button
             variant="default"
-            className="w-full justify-start mb-4 bg-indigo-600 hover:bg-indigo-700"
+            className="w-full justify-start mb-4 bg-indigo-600 hover:bg-indigo-700 text-white"
             onClick={handleNewChat}
           >
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -222,19 +213,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               <h2 className="text-sm font-semibold text-gray-700">
                 Chat History
               </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="p-1 h-auto"
-                onClick={handleManualRefresh}
-                disabled={isLoadingHistory}
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${
-                    isLoadingHistory ? "animate-spin" : ""
-                  }`}
-                />
-              </Button>
             </div>
 
             {isLoadingHistory ? (
@@ -244,7 +222,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <Skeleton className="h-12 w-full rounded-md bg-gray-100" />
               </div>
             ) : chatSessions && chatSessions.length > 0 ? (
-              <ScrollArea className="h-[calc(100vh-480px)] pr-3">
+              <ScrollArea className="h-[calc(100vh-460px)] pr-3">
                 <div className="space-y-2">
                   {chatSessions.map((session) => (
                     <Button
