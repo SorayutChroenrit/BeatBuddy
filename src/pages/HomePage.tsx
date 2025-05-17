@@ -14,6 +14,8 @@ const HomePage: React.FC = () => {
     "fun"
   );
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Add loading state to prevent multiple submissions
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Focus input when component loads
   useEffect(() => {
@@ -22,9 +24,13 @@ const HomePage: React.FC = () => {
     }
   }, []);
 
-  // Handlers
+  // Single request handler with debounce protection
   const handleStartChat = () => {
-    if (initialMessage.trim() !== "") {
+    if (initialMessage.trim() !== "" && !isSubmitting) {
+      // Set submitting flag to prevent duplicate requests
+      setIsSubmitting(true);
+
+      // Generate session ID only once
       const newSessionId = uuidv4();
 
       // Store initial message and mode in localStorage
@@ -34,8 +40,10 @@ const HomePage: React.FC = () => {
       );
       localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
 
-      // Navigate to chat page
-      navigate(`/chat/${newSessionId}`);
+      // Navigate to chat page with slight delay to prevent multiple renders
+      setTimeout(() => {
+        navigate(`/chat/${newSessionId}`);
+      }, 50);
     } else {
       // Focus input if empty
       inputRef.current?.focus();
@@ -45,7 +53,7 @@ const HomePage: React.FC = () => {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (initialMessage.trim() !== "") {
+      if (initialMessage.trim() !== "" && !isSubmitting) {
         handleStartChat();
       }
     }
@@ -62,11 +70,16 @@ const HomePage: React.FC = () => {
   };
 
   const handleSessionSelect = (sessionId: string) => {
-    navigate(`/chat/${sessionId}`);
+    // Prevent multiple clicks during navigation
+    if (!isSubmitting) {
+      setIsSubmitting(true);
+      navigate(`/chat/${sessionId}`);
+    }
   };
 
   const handleNewChat = () => {
     setInitialMessage("");
+    setIsSubmitting(false); // Reset submission state
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
@@ -152,9 +165,16 @@ const HomePage: React.FC = () => {
                   onClick={handleStartChat}
                   size="lg"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                  disabled={!initialMessage.trim()}
+                  disabled={!initialMessage.trim() || isSubmitting}
                 >
-                  Let's talk about music <ArrowRight className="ml-2 h-5 w-5" />
+                  {isSubmitting ? (
+                    "Starting chat..."
+                  ) : (
+                    <>
+                      Let's talk about music{" "}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
