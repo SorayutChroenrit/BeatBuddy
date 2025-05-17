@@ -37,10 +37,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const checkSession = async () => {
     try {
+      console.log("Checking session at URL:", `${API_URL}/api/auth/session`);
       const response = await api.get("/api/auth/session");
+      console.log("Session response:", response.data);
       setUser(response.data?.user || null);
     } catch (error) {
       console.error("Error checking session:", error);
+      console.log("Full error object:", JSON.stringify(error, null, 2));
       setUser(null);
     } finally {
       setLoading(false);
