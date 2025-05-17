@@ -16,37 +16,45 @@ const ChatPage: React.FC = () => {
     "fun"
   );
   const [initialUserMessage, setInitialUserMessage] = useState<string>("");
+  const [initialMessageLoaded, setInitialMessageLoaded] = useState(false);
 
   // Use TanStack Query to fetch session data
   const { data: sessionData = [], isLoading: loading } =
     useSessionData(sessionId);
 
-  // Check for initial message and update mode from session data
+  // Check for initial message and update mode from localStorage
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId && !initialMessageLoaded) {
       // Try to get initial message from localStorage
       const storedInitialMessage = localStorage.getItem(
         `chat_initial_message_${sessionId}`
       );
       const storedMode = localStorage.getItem(`chat_initial_mode_${sessionId}`);
 
+      // Debug
+      console.log("Found stored message:", storedInitialMessage);
+      console.log("Found stored mode:", storedMode);
+
       if (storedInitialMessage) {
         setInitialUserMessage(storedInitialMessage);
-        // Clear after retrieving to avoid reusing it on refresh
-        localStorage.removeItem(`chat_initial_message_${sessionId}`);
+        setInitialMessageLoaded(true);
+
+        // Only remove from localStorage after successfully setting the state
+        setTimeout(() => {
+          localStorage.removeItem(`chat_initial_message_${sessionId}`);
+        }, 500);
       }
 
-      if (
-        storedMode &&
-        (storedMode === "fun" ||
-          storedMode === "mentor" ||
-          storedMode === "buddy")
-      ) {
+      if (storedMode && ["fun", "mentor", "buddy"].includes(storedMode)) {
         setCurrentMode(storedMode as "fun" | "mentor" | "buddy");
-        localStorage.removeItem(`chat_initial_mode_${sessionId}`);
+
+        // Only remove from localStorage after successfully setting the state
+        setTimeout(() => {
+          localStorage.removeItem(`chat_initial_mode_${sessionId}`);
+        }, 500);
       }
     }
-  }, [sessionId]);
+  }, [sessionId, initialMessageLoaded]);
 
   // Update mode from session data
   useEffect(() => {
@@ -59,12 +67,7 @@ const ChatPage: React.FC = () => {
 
       // Set current mode from the most recent message
       const latestMode = sortedData[0].mode;
-      if (
-        latestMode &&
-        (latestMode === "fun" ||
-          latestMode === "mentor" ||
-          latestMode === "buddy")
-      ) {
+      if (latestMode && ["fun", "mentor", "buddy"].includes(latestMode)) {
         setCurrentMode(latestMode as "fun" | "mentor" | "buddy");
       }
     }
@@ -77,12 +80,20 @@ const ChatPage: React.FC = () => {
 
   // Handle session selection from sidebar
   const handleSessionSelect = (newSessionId: string) => {
+    // Reset the initial message state when switching sessions
+    setInitialUserMessage("");
+    setInitialMessageLoaded(false);
+
     // Use React Router for client-side navigation
     navigate(`/chat/${newSessionId}`);
   };
 
   // Handle new chat button
   const handleNewChat = () => {
+    // Reset the initial message state for new chats
+    setInitialUserMessage("");
+    setInitialMessageLoaded(false);
+
     // Create a new session ID
     const newSessionId = uuidv4();
 
@@ -97,6 +108,16 @@ const ChatPage: React.FC = () => {
     }
   }, [user, navigate]);
 
+  // Debug what's being passed to MusicChatbot
+  useEffect(() => {
+    console.log(
+      "Passing to MusicChatbot - initialUserMessage:",
+      initialUserMessage
+    );
+    console.log("Passing to MusicChatbot - mode:", currentMode);
+    console.log("Passing to MusicChatbot - sessionId:", sessionId);
+  }, [initialUserMessage, currentMode, sessionId]);
+
   return (
     <div className="flex h-screen">
       {/* Sidebar handles its own chat history fetching */}
@@ -108,7 +129,7 @@ const ChatPage: React.FC = () => {
         selectedSessionId={sessionId}
       />
       <div className="flex-1 overflow-hidden">
-        {loading ? (
+        {loading && !initialUserMessage ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
           </div>

@@ -15,7 +15,6 @@ const HomePage: React.FC = () => {
   );
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Consolidated to a single navigation lock
   const isNavigatingRef = useRef(false);
 
   // Focus input when component loads
@@ -51,15 +50,19 @@ const HomePage: React.FC = () => {
     // Generate a session ID
     const newSessionId = uuidv4();
 
-    // Store initial message and mode in localStorage
+    // IMPORTANT FIX: Store initial message and mode in localStorage CORRECTLY
+    // Make sure the data is properly stored before navigation
     localStorage.setItem(
       `chat_initial_message_${newSessionId}`,
-      initialMessage
+      initialMessage.trim()
     );
     localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
 
-    // Navigate to chat page
-    navigate(`/chat/${newSessionId}`);
+    // Add a small delay to ensure localStorage is updated before navigation
+    setTimeout(() => {
+      // Navigate to chat page
+      navigate(`/chat/${newSessionId}`);
+    }, 50);
   };
 
   const handleModeChange = (mode: "fun" | "mentor" | "buddy") => {
@@ -161,7 +164,7 @@ const HomePage: React.FC = () => {
                 ref={inputRef}
                 value={initialMessage}
                 onChange={(e) => setInitialMessage(e.target.value)}
-                onKeyDown={handleKeyDown} // Using the separate keyboard handler
+                onKeyDown={handleKeyDown}
                 placeholder="Ask about music, theory, or get recommendations..."
                 className="min-h-20 resize-none text-lg mb-4 p-4"
                 rows={3}
@@ -169,7 +172,7 @@ const HomePage: React.FC = () => {
 
               <div className="flex justify-end">
                 <Button
-                  onClick={handleStartChat} // Using the separate button handler
+                  onClick={handleStartChat}
                   size="lg"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   disabled={!initialMessage.trim() || isSubmitting}

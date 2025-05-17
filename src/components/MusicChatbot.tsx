@@ -126,6 +126,17 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     setImageError(true);
   };
 
+  // Clear all state when props change (for proper resets)
+  useEffect(() => {
+    if (propSessionId) {
+      setSessionId(propSessionId);
+      setSelectedSessionId(propSessionId);
+
+      // IMPORTANT FIX: Reset these states whenever the session ID changes
+      setInitialMessageProcessed(false);
+    }
+  }, [propSessionId]);
+
   // Show initial greeting ONLY if no session data and not already shown
   useEffect(() => {
     // Only set initial greeting if no sessionData was provided and not already shown
@@ -160,8 +171,15 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     messages.length,
   ]);
 
-  // Handle initial user message - completely separate from session data processing
+  // CRITICAL FIX: Handle initial user message properly
   useEffect(() => {
+    // Print debug info
+    console.log("Initial message effect running", {
+      initialUserMessage,
+      processed: initialMessageProcessed,
+      messagesLength: messages.length,
+    });
+
     // Check if there's an initial message to process AND it hasn't been processed yet
     if (
       initialUserMessage &&
@@ -188,7 +206,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
       // Use a slight delay to make it feel more natural
       const timer = setTimeout(() => {
-        // Then fetch and process API response
+        // Then send API request with the message
         handleSendMessage(initialUserMessage);
       }, 300);
 
@@ -205,14 +223,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       fetchSessionData(selectedSessionId || sessionId);
     }
   }, [sessionDataFromQuery, selectedSessionId, sessionId]);
-
-  // Update sessionId if prop changes
-  useEffect(() => {
-    if (propSessionId) {
-      setSessionId(propSessionId);
-      setSelectedSessionId(propSessionId);
-    }
-  }, [propSessionId]);
 
   // Update mode if prop changes
   useEffect(() => {
@@ -341,34 +351,50 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       return;
     }
 
-    // Add user message
-    const userMessage: Message = {
-      id: userMessageId,
-      content: messageToSend,
-      sender: "user",
-      timestamp: new Date(),
-      complete: true,
-    };
+    // Add user message if it's not from initialUserMessage (which is already added)
+    if (
+      !customMessage ||
+      !messages.some(
+        (msg) => msg.sender === "user" && msg.content === messageToSend
+      )
+    ) {
+      const userMessage: Message = {
+        id: userMessageId,
+        content: messageToSend,
+        sender: "user",
+        timestamp: new Date(),
+        complete: true,
+      };
 
-    setMessages((prevMessages) => [...prevMessages, userMessage]);
+      setMessages((prevMessages) => [...prevMessages, userMessage]);
+    }
+
     if (!customMessage) setInputValue("");
 
-    // Check if already processed
-    if (processedMessages[userMessageId]) {
+    // Check if already processed - NOTE: we're removing this check for initialUserMessage
+    // to ensure it always gets sent to the API
+    if (!customMessage && processedMessages[userMessageId]) {
       console.warn("This message was already processed, skipping API call");
       return;
     }
 
-    setProcessedMessages((prev) => ({ ...prev, [userMessageId]: true }));
+    if (!customMessage) {
+      setProcessedMessages((prev) => ({ ...prev, [userMessageId]: true }));
+    }
+
     setIsTyping(true);
 
     try {
+      console.log("Sending message to API:", messageToSend);
+
       const response = await sendMessageMutation.mutateAsync({
         question: messageToSend,
         mode: currentMode,
         session_id: selectedSessionId || sessionId,
         user_id: user?.id || userId,
       });
+
+      console.log("Got API response:", response);
 
       const botMessageId = `bot-${messageId}`;
       const botMessage: Message = {
