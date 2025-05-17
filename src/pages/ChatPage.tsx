@@ -17,12 +17,13 @@ const ChatPage: React.FC = () => {
   );
   const [initialUserMessage, setInitialUserMessage] = useState<string>("");
   const [initialMessageLoaded, setInitialMessageLoaded] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   // Use TanStack Query to fetch session data
   const { data: sessionData = [], isLoading: loading } =
     useSessionData(sessionId);
 
-  // Check for initial message and update mode from localStorage
+  // Check for initial message and update mode from localStorage - CRITICAL FIX
   useEffect(() => {
     if (sessionId && !initialMessageLoaded) {
       // Try to get initial message from localStorage
@@ -35,24 +36,30 @@ const ChatPage: React.FC = () => {
       console.log("Found stored message:", storedInitialMessage);
       console.log("Found stored mode:", storedMode);
 
-      if (storedInitialMessage) {
+      // If we have an initial message, process it
+      if (storedInitialMessage && storedInitialMessage.trim() !== "") {
         setInitialUserMessage(storedInitialMessage);
         setInitialMessageLoaded(true);
 
         // Only remove from localStorage after successfully setting the state
+        // and after a delay to ensure it's properly processed by MusicChatbot
         setTimeout(() => {
           localStorage.removeItem(`chat_initial_message_${sessionId}`);
-        }, 500);
+        }, 1000);
       }
 
+      // Update mode if available
       if (storedMode && ["fun", "mentor", "buddy"].includes(storedMode)) {
         setCurrentMode(storedMode as "fun" | "mentor" | "buddy");
 
         // Only remove from localStorage after successfully setting the state
         setTimeout(() => {
           localStorage.removeItem(`chat_initial_mode_${sessionId}`);
-        }, 500);
+        }, 1000);
       }
+
+      // Mark initial load as complete
+      setInitialLoadComplete(true);
     }
   }, [sessionId, initialMessageLoaded]);
 
@@ -83,6 +90,7 @@ const ChatPage: React.FC = () => {
     // Reset the initial message state when switching sessions
     setInitialUserMessage("");
     setInitialMessageLoaded(false);
+    setInitialLoadComplete(false);
 
     // Use React Router for client-side navigation
     navigate(`/chat/${newSessionId}`);
@@ -93,6 +101,7 @@ const ChatPage: React.FC = () => {
     // Reset the initial message state for new chats
     setInitialUserMessage("");
     setInitialMessageLoaded(false);
+    setInitialLoadComplete(false);
 
     // Create a new session ID
     const newSessionId = uuidv4();
@@ -129,7 +138,7 @@ const ChatPage: React.FC = () => {
         selectedSessionId={sessionId}
       />
       <div className="flex-1 overflow-hidden">
-        {loading && !initialUserMessage ? (
+        {loading && !initialLoadComplete ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
           </div>

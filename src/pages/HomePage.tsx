@@ -32,7 +32,7 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // Separate handler for button click and actual chat initiation
+  // CRITICAL FIX: Separate handler for button click and actual chat initiation
   const handleStartChat = () => {
     // Check for empty message or already in progress
     if (
@@ -50,19 +50,39 @@ const HomePage: React.FC = () => {
     // Generate a session ID
     const newSessionId = uuidv4();
 
-    // IMPORTANT FIX: Store initial message and mode in localStorage CORRECTLY
-    // Make sure the data is properly stored before navigation
-    localStorage.setItem(
-      `chat_initial_message_${newSessionId}`,
-      initialMessage.trim()
+    // Debug log
+    console.log(
+      `Starting chat with message: "${initialMessage}" and mode: ${currentMode}`
     );
-    localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
 
-    // Add a small delay to ensure localStorage is updated before navigation
-    setTimeout(() => {
-      // Navigate to chat page
-      navigate(`/chat/${newSessionId}`);
-    }, 50);
+    // CRITICAL FIX: Store initial message and mode in localStorage properly
+    try {
+      localStorage.setItem(
+        `chat_initial_message_${newSessionId}`,
+        initialMessage.trim()
+      );
+      localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
+
+      console.log("Stored message in localStorage:", initialMessage.trim());
+      console.log("Stored mode in localStorage:", currentMode);
+      console.log("Storage key:", `chat_initial_message_${newSessionId}`);
+
+      // Add a forced delay to ensure localStorage updates before navigation
+      setTimeout(() => {
+        // Verify the message was stored properly
+        const verifyMessage = localStorage.getItem(
+          `chat_initial_message_${newSessionId}`
+        );
+        console.log("Verification - message in localStorage:", verifyMessage);
+
+        // Navigate to chat page
+        navigate(`/chat/${newSessionId}`);
+      }, 100);
+    } catch (error) {
+      console.error("Error storing message in localStorage:", error);
+      setIsSubmitting(false);
+      isNavigatingRef.current = false;
+    }
   };
 
   const handleModeChange = (mode: "fun" | "mentor" | "buddy") => {

@@ -57,19 +57,19 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   const [displayedContents, setDisplayedContents] = useState<
     Record<string, string>
   >({});
-  // Fix 1: Only keep the setter function for loading
   const setLoading = useState(false)[1];
   const [imageError, setImageError] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  // Add a flag to track which messages have been sent to the API
-  const [processedMessages, setProcessedMessages] = useState<
-    Record<string, boolean>
-  >({});
-
   // New state to properly track if the initial message has been processed
   const [initialMessageProcessed, setInitialMessageProcessed] = useState(false);
   const [initialGreetingShown, setInitialGreetingShown] = useState(false);
+
+  // CRITICAL FIX: Track API call in progress separately from typing indicator
+  const [apiCallInProgress, setApiCallInProgress] = useState(false);
+
+  // For debugging
+  const lastSentMessageRef = useRef("");
 
   // Generate a session ID for this chat
   const [sessionId, setSessionId] = useState<string>(propSessionId || uuidv4());
@@ -86,7 +86,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
   // Use TanStack Query mutations and queries
   const sendMessageMutation = useSendMessage();
-  // Fix 2: Remove the unused loadingSession variable
   const { data: sessionDataFromQuery = [] } = useSessionData(
     propSessionId || sessionId
   );
@@ -178,18 +177,21 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       initialUserMessage,
       processed: initialMessageProcessed,
       messagesLength: messages.length,
+      apiInProgress: apiCallInProgress,
     });
 
-    // Check if there's an initial message to process AND it hasn't been processed yet
+    // Check if there's an initial message to process AND it hasn't been processed yet AND no API call is in progress
     if (
       initialUserMessage &&
       initialUserMessage.trim() !== "" &&
-      !initialMessageProcessed
+      !initialMessageProcessed &&
+      !apiCallInProgress
     ) {
-      // Mark as processed immediately using state
+      // Mark as processed immediately to prevent duplicates
       setInitialMessageProcessed(true);
 
       console.log("Processing initial user message:", initialUserMessage);
+      lastSentMessageRef.current = initialUserMessage;
 
       // First, always show the user's message
       const userMessageId = `initial-user-${Date.now()}`;
@@ -201,18 +203,23 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         complete: true, // User messages are always complete
       };
 
-      // Always display the user message
+      // Add the user message immediately
       setMessages((prevMessages) => [...prevMessages, userMessage]);
 
-      // Use a slight delay to make it feel more natural
+      // Use a slight delay to make it feel more natural and ensure the UI has updated
       const timer = setTimeout(() => {
-        // Then send API request with the message
-        handleSendMessage(initialUserMessage);
+        // Directly call the message sending function with explicit props
+        sendMessageToAPI(
+          initialUserMessage,
+          currentMode,
+          selectedSessionId || sessionId,
+          user?.id || userId
+        );
       }, 300);
 
       return () => clearTimeout(timer);
     }
-  }, [initialUserMessage, initialMessageProcessed]); // Only depend on these two values
+  }, [initialUserMessage, initialMessageProcessed, apiCallInProgress]);
 
   // Process sessionData if provided - completely separate effect
   useEffect(() => {
@@ -330,10 +337,79 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
-  // Handle send message with TanStack Query - with duplicate message prevention
+  // CRITICAL FIX: Direct function for sending to API to avoid hooks issues
+  const sendMessageToAPI = async (
+    message: string,
+    mode: BotMode,
+    session: string,
+    user_id: string
+  ) => {
+    if (apiCallInProgress) {
+      console.warn("API call already in progress, cannot send:", message);
+      return;
+    }
+
+    // Set both flags for UI feedback
+    setIsTyping(true);
+    setApiCallInProgress(true);
+    console.log(
+      `Sending message to API: "${message}" with mode: ${mode}, session: ${session}`
+    );
+
+    try {
+      const response = await sendMessageMutation.mutateAsync({
+        question: message,
+        mode: mode,
+        session_id: session,
+        user_id: user_id,
+      });
+
+      console.log("Got API response for message:", message);
+      console.log("Response content:", response.response);
+
+      const botMessageId = `bot-${Date.now()}`;
+      const botMessage: Message = {
+        id: botMessageId,
+        content: response.response,
+        sender: "bot",
+        timestamp: new Date(),
+        complete: false, // Start with typing effect
+      };
+
+      setMessages((prevMessages) => [...prevMessages, botMessage]);
+      setDisplayedContents((prev) => ({
+        ...prev,
+        [botMessageId]: "",
+      }));
+    } catch (error) {
+      console.error(`Error in chat flow for message "${message}":`, error);
+
+      // Add error message
+      const errorMessageId = `error-${Date.now()}`;
+      const errorMessage: Message = {
+        id: errorMessageId,
+        content:
+          "Sorry, I encountered an error while processing your request. Please try again.",
+        sender: "bot",
+        timestamp: new Date(),
+        complete: true,
+      };
+
+      setMessages((prevMessages) => [...prevMessages, errorMessage]);
+      setDisplayedContents((prev) => ({
+        ...prev,
+        [errorMessageId]: errorMessage.content,
+      }));
+    } finally {
+      setIsTyping(false);
+      setApiCallInProgress(false);
+    }
+  };
+
+  // Handle send message (UI wrapper for sendMessageToAPI)
   const handleSendMessage = async (customMessage?: string) => {
     const messageToSend = customMessage || inputValue;
-    if (messageToSend.trim() === "" || isTyping) return;
+    if (messageToSend.trim() === "" || isTyping || apiCallInProgress) return;
 
     const messageId = `msg-${Date.now()}`;
     const userMessageId = `user-${messageId}`;
@@ -346,12 +422,24 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         Date.now() - msg.timestamp.getTime() < 5000
     );
 
+    // Also check against the last sent message (esp. for initial message)
+    if (messageToSend === lastSentMessageRef.current) {
+      console.log(
+        "Duplicate of last sent message detected, ignoring:",
+        messageToSend
+      );
+      return;
+    }
+
     if (isDuplicate) {
       console.log("Duplicate message detected, ignoring:", messageToSend);
       return;
     }
 
-    // Add user message if it's not from initialUserMessage (which is already added)
+    // Store last sent message for duplicate checking
+    lastSentMessageRef.current = messageToSend;
+
+    // Add user message if it's from direct input (not initial message)
     if (
       !customMessage ||
       !messages.some(
@@ -369,69 +457,16 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       setMessages((prevMessages) => [...prevMessages, userMessage]);
     }
 
+    // Clear input field if this is a direct user input
     if (!customMessage) setInputValue("");
 
-    // Check if already processed - NOTE: we're removing this check for initialUserMessage
-    // to ensure it always gets sent to the API
-    if (!customMessage && processedMessages[userMessageId]) {
-      console.warn("This message was already processed, skipping API call");
-      return;
-    }
-
-    if (!customMessage) {
-      setProcessedMessages((prev) => ({ ...prev, [userMessageId]: true }));
-    }
-
-    setIsTyping(true);
-
-    try {
-      console.log("Sending message to API:", messageToSend);
-
-      const response = await sendMessageMutation.mutateAsync({
-        question: messageToSend,
-        mode: currentMode,
-        session_id: selectedSessionId || sessionId,
-        user_id: user?.id || userId,
-      });
-
-      console.log("Got API response:", response);
-
-      const botMessageId = `bot-${messageId}`;
-      const botMessage: Message = {
-        id: botMessageId,
-        content: response.response,
-        sender: "bot",
-        timestamp: new Date(),
-        complete: false, // Start with typing effect
-      };
-
-      setMessages((prevMessages) => [...prevMessages, botMessage]);
-      setDisplayedContents((prev) => ({
-        ...prev,
-        [botMessageId]: "",
-      }));
-    } catch (error) {
-      console.error("Error in chat flow:", error);
-
-      // Add error message
-      const errorMessageId = `error-${messageId}`;
-      const errorMessage: Message = {
-        id: errorMessageId,
-        content:
-          "Sorry, I encountered an error while processing your request. Please try again.",
-        sender: "bot",
-        timestamp: new Date(),
-        complete: true,
-      };
-
-      setMessages((prevMessages) => [...prevMessages, errorMessage]);
-      setDisplayedContents((prev) => ({
-        ...prev,
-        [errorMessageId]: errorMessage.content,
-      }));
-    } finally {
-      setIsTyping(false);
-    }
+    // Send the message to the API
+    sendMessageToAPI(
+      messageToSend,
+      currentMode,
+      selectedSessionId || sessionId,
+      user?.id || userId
+    );
   };
 
   // Typing effect useEffect
@@ -486,8 +521,8 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      // Only send if not already typing
-      if (!isTyping) {
+      // Only send if not already in progress
+      if (!isTyping && !apiCallInProgress) {
         handleSendMessage();
       }
     }
@@ -778,12 +813,13 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
               placeholder="Ask about music, theory, or get recommendations..."
               className="min-h-12 resize-none"
               rows={1}
+              disabled={isTyping || apiCallInProgress}
             />
             <Button
               onClick={() => handleSendMessage()}
               size="icon"
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              disabled={isTyping}
+              disabled={isTyping || apiCallInProgress}
             >
               <Send className="h-4 w-4" />
             </Button>
