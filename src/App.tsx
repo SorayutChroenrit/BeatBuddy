@@ -11,7 +11,6 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import ChatPage from "./pages/ChatPage";
-import AuthCallback from "./components/AuthCallback"; 
 
 function App() {
   return (
@@ -20,7 +19,6 @@ function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />{" "}
             {/* Add this route */}
             <Route
               path="/"
