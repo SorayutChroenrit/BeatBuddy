@@ -20,6 +20,7 @@ interface AuthContextType {
   signIn: (provider: string) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
+  checkSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,13 +29,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     checkSession();
   }, []);
 
-  const checkSession = async () => {
+  const checkSession = async (): Promise<void> => {
     try {
       const response = await api.get("/api/auth/session");
       setUser(response.data?.user || null);
@@ -47,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const signIn = async (provider: string) => {
+  const signIn = async (provider: string): Promise<void> => {
     try {
       // Save the current hash location to return to after login
       const returnUrl = window.location.hash.substring(1) || "/";
@@ -62,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     try {
       await api.post("/api/auth/signout");
       setUser(null);
@@ -74,16 +75,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <AuthContext.Provider value={{ user, signIn, signOut, loading }}>
+    <AuthContext.Provider
+      value={{ user, signIn, signOut, loading, checkSession }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
+
+export default api;
