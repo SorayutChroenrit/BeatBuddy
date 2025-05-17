@@ -14,9 +14,8 @@ const HomePage: React.FC = () => {
     "fun"
   );
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Add loading state to prevent multiple submissions
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Add a ref to prevent multiple submissions during navigation
+  // Consolidated to a single navigation lock
   const isNavigatingRef = useRef(false);
 
   // Focus input when component loads
@@ -26,9 +25,17 @@ const HomePage: React.FC = () => {
     }
   }, []);
 
-  // Improved request handler with better submission protection
-  const handleStartChat = () => {
-    // Double-check we're not already submitting or navigating
+  // Single consolidated handler function for both button click and keyboard events
+  const handleStartChat = (e?: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // If this is a keyboard event, check that it's Enter without Shift
+    if (e) {
+      if (e.key !== "Enter" || e.shiftKey) {
+        return;
+      }
+      e.preventDefault();
+    }
+
+    // Check for empty message or already in progress
     if (
       initialMessage.trim() === "" ||
       isSubmitting ||
@@ -37,11 +44,11 @@ const HomePage: React.FC = () => {
       return;
     }
 
-    // Set both state and ref to prevent any possibility of double submissions
+    // Set flags to prevent duplicate submissions
     setIsSubmitting(true);
     isNavigatingRef.current = true;
 
-    // Generate session ID only once
+    // Generate a session ID
     const newSessionId = uuidv4();
 
     // Store initial message and mode in localStorage
@@ -51,43 +58,8 @@ const HomePage: React.FC = () => {
     );
     localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
 
-    // Navigate directly to chat page without any setTimeout
+    // Navigate to chat page
     navigate(`/chat/${newSessionId}`);
-  };
-
-  // Separate handler for keyboard submission to avoid conflicts
-  const handleKeyboardSubmit = (
-    e: React.KeyboardEvent<HTMLTextAreaElement>
-  ) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-
-      // Double-check we're not already submitting or navigating
-      if (
-        initialMessage.trim() === "" ||
-        isSubmitting ||
-        isNavigatingRef.current
-      ) {
-        return;
-      }
-
-      // Set both state and ref to prevent any possibility of double submissions
-      setIsSubmitting(true);
-      isNavigatingRef.current = true;
-
-      // Generate new session ID
-      const newSessionId = uuidv4();
-
-      // Store data in localStorage
-      localStorage.setItem(
-        `chat_initial_message_${newSessionId}`,
-        initialMessage
-      );
-      localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
-
-      // Navigate without delay
-      navigate(`/chat/${newSessionId}`);
-    }
   };
 
   const handleModeChange = (mode: "fun" | "mentor" | "buddy") => {
@@ -102,11 +74,13 @@ const HomePage: React.FC = () => {
 
   const handleSessionSelect = (sessionId: string) => {
     // Prevent multiple clicks during navigation
-    if (!isSubmitting && !isNavigatingRef.current) {
-      setIsSubmitting(true);
-      isNavigatingRef.current = true;
-      navigate(`/chat/${sessionId}`);
+    if (isSubmitting || isNavigatingRef.current) {
+      return;
     }
+
+    setIsSubmitting(true);
+    isNavigatingRef.current = true;
+    navigate(`/chat/${sessionId}`);
   };
 
   const handleNewChat = () => {
@@ -187,7 +161,7 @@ const HomePage: React.FC = () => {
                 ref={inputRef}
                 value={initialMessage}
                 onChange={(e) => setInitialMessage(e.target.value)}
-                onKeyDown={handleKeyboardSubmit}
+                onKeyDown={handleStartChat} // Using the consolidated handler
                 placeholder="Ask about music, theory, or get recommendations..."
                 className="min-h-20 resize-none text-lg mb-4 p-4"
                 rows={3}
@@ -195,7 +169,7 @@ const HomePage: React.FC = () => {
 
               <div className="flex justify-end">
                 <Button
-                  onClick={handleStartChat}
+                  onClick={() => handleStartChat()} // Using the consolidated handler
                   size="lg"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   disabled={!initialMessage.trim() || isSubmitting}
