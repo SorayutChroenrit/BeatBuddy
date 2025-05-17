@@ -34,7 +34,6 @@ const UserDropdown = () => {
         console.log("Modified image URL with cache buster:", googleImageUrl);
         setImageUrl(googleImageUrl);
       } else {
-        // For non-Google URLs, use as is
         setImageUrl(user.image);
       }
     } else {
