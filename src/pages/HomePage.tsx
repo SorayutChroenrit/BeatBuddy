@@ -24,13 +24,13 @@ const HomePage: React.FC = () => {
     }
   }, []);
 
-  // Single request handler with debounce protection
+  // Improved request handler with proper submission protection
   const handleStartChat = () => {
     if (initialMessage.trim() !== "" && !isSubmitting) {
-      // Set submitting flag to prevent duplicate requests
+      // Set submitting flag immediately to prevent duplicate requests
       setIsSubmitting(true);
 
-      // Generate session ID only once
+      // Generate session ID
       const newSessionId = uuidv4();
 
       // Store initial message and mode in localStorage
@@ -40,22 +40,19 @@ const HomePage: React.FC = () => {
       );
       localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
 
-      // Navigate to chat page with slight delay to prevent multiple renders
-      setTimeout(() => {
-        navigate(`/chat/${newSessionId}`);
-      }, 50);
+      // Navigate to chat page directly without setTimeout
+      navigate(`/chat/${newSessionId}`);
     } else {
       // Focus input if empty
       inputRef.current?.focus();
     }
   };
 
+  // Improved key press handler
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (initialMessage.trim() !== "" && !isSubmitting) {
-        handleStartChat();
-      }
+      handleStartChat();
     }
   };
 
