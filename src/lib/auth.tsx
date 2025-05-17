@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
-console.log("API URL from env:", import.meta.env.VITE_BACKEND_URL);
 
 const api = axios.create({
   baseURL: API_URL,
@@ -38,9 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const checkSession = async () => {
     try {
-      console.log("Checking session at URL:", `${API_URL}/api/auth/session`);
       const response = await api.get("/api/auth/session");
-      console.log("Session response:", response.data);
       setUser(response.data?.user || null);
     } catch (error) {
       console.error("Error checking session:", error);
@@ -70,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       await api.post("/api/auth/signout");
       setUser(null);
-      window.location.href = "/#/login";
+      window.location.href = "/BeatBuddy/#/login";
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;
