@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
 
 const API_URL = process.env.VITE_BACKEND_URL;
+console.log("API URL from env:", import.meta.env.VITE_BACKEND_URL);
 
 const api = axios.create({
   baseURL: API_URL,
