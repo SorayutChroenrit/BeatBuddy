@@ -206,7 +206,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       console.log("Processing session data for ID:", id);
 
       const data = sessionDataFromQuery;
-      console.log("Session data:", data);
 
       if (Array.isArray(data) && data.length > 0) {
         // Sort by created_at to get the chronological order

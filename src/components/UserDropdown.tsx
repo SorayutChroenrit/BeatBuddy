@@ -23,15 +23,12 @@ const UserDropdown = () => {
     setImageError(false);
 
     if (user?.image) {
-      console.log("Original image URL:", user.image);
-
       // For Google URLs, handle them differently due to Chrome CORS caching issues
       if (user.image.includes("googleusercontent.com")) {
         // Add a cache-busting parameter to force Chrome to make a new request
         // This avoids the CORS error that happens when Chrome tries to reuse a cached image
         const cacheBuster = `?not-from-cache-please=${Date.now()}`;
         const googleImageUrl = `${user.image}${cacheBuster}`;
-        console.log("Modified image URL with cache buster:", googleImageUrl);
         setImageUrl(googleImageUrl);
       } else {
         setImageUrl(user.image);

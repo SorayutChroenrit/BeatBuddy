@@ -13,7 +13,6 @@ export const apiClient = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    console.log("Making request:", config.method?.toUpperCase(), config.url);
     return config;
   },
   (error) => {

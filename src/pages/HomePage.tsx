@@ -25,16 +25,16 @@ const HomePage: React.FC = () => {
     }
   }, []);
 
-  // Single consolidated handler function for both button click and keyboard events
-  const handleStartChat = (e?: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // If this is a keyboard event, check that it's Enter without Shift
-    if (e) {
-      if (e.key !== "Enter" || e.shiftKey) {
-        return;
-      }
+  // Handler function for keyboard events only
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      handleStartChat();
     }
+  };
 
+  // Separate handler for button click and actual chat initiation
+  const handleStartChat = () => {
     // Check for empty message or already in progress
     if (
       initialMessage.trim() === "" ||
@@ -161,7 +161,7 @@ const HomePage: React.FC = () => {
                 ref={inputRef}
                 value={initialMessage}
                 onChange={(e) => setInitialMessage(e.target.value)}
-                onKeyDown={handleStartChat} // Using the consolidated handler
+                onKeyDown={handleKeyDown} // Using the separate keyboard handler
                 placeholder="Ask about music, theory, or get recommendations..."
                 className="min-h-20 resize-none text-lg mb-4 p-4"
                 rows={3}
@@ -169,7 +169,7 @@ const HomePage: React.FC = () => {
 
               <div className="flex justify-end">
                 <Button
-                  onClick={() => handleStartChat()} // Using the consolidated handler
+                  onClick={handleStartChat} // Using the separate button handler
                   size="lg"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   disabled={!initialMessage.trim() || isSubmitting}
