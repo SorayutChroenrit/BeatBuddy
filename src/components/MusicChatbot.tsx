@@ -67,8 +67,9 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     Record<string, boolean>
   >({});
 
-  // Added to prevent duplicate initial message processing
-  const initialMessageProcessedRef = useRef(false);
+  // New state to properly track if the initial message has been processed
+  const [initialMessageProcessed, setInitialMessageProcessed] = useState(false);
+  const [initialGreetingShown, setInitialGreetingShown] = useState(false);
 
   // Generate a session ID for this chat
   const [sessionId, setSessionId] = useState<string>(propSessionId || uuidv4());
@@ -125,23 +126,13 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     setImageError(true);
   };
 
-  // Process sessionData if provided
+  // Show initial greeting ONLY if no session data and not already shown
   useEffect(() => {
-    if (sessionDataFromQuery && sessionDataFromQuery.length > 0) {
-      fetchSessionData(selectedSessionId || sessionId);
-    }
-  }, [sessionDataFromQuery, selectedSessionId, sessionId]);
-
-  // Handle initial messages - TypeScript safe implementation
-  useEffect(() => {
-    // Only run this effect once
-    if (initialMessageProcessedRef.current) {
-      return;
-    }
-    // First, add the initial greeting if needed
+    // Only set initial greeting if no sessionData was provided and not already shown
     if (
       sessionData.length === 0 &&
-      !sessionDataFromQuery.length &&
+      sessionDataFromQuery.length === 0 &&
+      !initialGreetingShown &&
       messages.length === 0
     ) {
       const initialMessage: Message = {
@@ -150,36 +141,70 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           "👋 Hi there! I'm your music companion. How can I help you today?",
         sender: "bot",
         timestamp: new Date(),
-        complete: true,
+        complete: true, // Initial greeting is always complete
       };
+
       setMessages([initialMessage]);
+      setInitialGreetingShown(true);
+
+      // Initialize displayed content for initial message
       setDisplayedContents((prev) => ({
         ...prev,
         [initialMessage.id]: initialMessage.content,
       }));
     }
-    // Then, process the initial user message if it exists
-    if (initialUserMessage && initialUserMessage.trim() !== "") {
-      initialMessageProcessedRef.current = true;
+  }, [
+    sessionData.length,
+    sessionDataFromQuery.length,
+    initialGreetingShown,
+    messages.length,
+  ]);
 
-      // Add user message
+  // Handle initial user message - completely separate from session data processing
+  useEffect(() => {
+    // Check if there's an initial message to process AND it hasn't been processed yet
+    if (
+      initialUserMessage &&
+      initialUserMessage.trim() !== "" &&
+      !initialMessageProcessed
+    ) {
+      // Mark as processed immediately using state
+      setInitialMessageProcessed(true);
+
+      console.log("Processing initial user message:", initialUserMessage);
+
+      // First, always show the user's message
       const userMessageId = `initial-user-${Date.now()}`;
       const userMessage: Message = {
         id: userMessageId,
         content: initialUserMessage,
         sender: "user",
         timestamp: new Date(),
-        complete: true,
+        complete: true, // User messages are always complete
       };
 
+      // Always display the user message
       setMessages((prevMessages) => [...prevMessages, userMessage]);
 
-      // Use timeout to make it feel more natural
-      setTimeout(() => {
+      // Use a slight delay to make it feel more natural
+      const timer = setTimeout(() => {
+        // Then fetch and process API response
         handleSendMessage(initialUserMessage);
       }, 300);
+
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [initialUserMessage, initialMessageProcessed]); // Only depend on these two values
+
+  // Process sessionData if provided - completely separate effect
+  useEffect(() => {
+    if (
+      (sessionDataFromQuery && sessionDataFromQuery.length > 0) ||
+      (sessionData && sessionData.length > 0)
+    ) {
+      fetchSessionData(selectedSessionId || sessionId);
+    }
+  }, [sessionDataFromQuery, selectedSessionId, sessionId]);
 
   // Update sessionId if prop changes
   useEffect(() => {
@@ -201,7 +226,8 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     try {
       console.log("Processing session data for ID:", id);
 
-      const data = sessionDataFromQuery;
+      // Use either provided sessionData or data from query
+      const data = sessionData.length > 0 ? sessionData : sessionDataFromQuery;
 
       if (Array.isArray(data) && data.length > 0) {
         // Sort by created_at to get the chronological order
@@ -225,20 +251,34 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         const formattedMessages: Message[] = [];
         const newDisplayedContents: Record<string, string> = {};
 
-        // Add initial greeting message
-        const initialMessageId = "initial";
-        const initialMessage = {
-          id: initialMessageId,
-          content:
-            "👋 Hi there! I'm your music companion. How can I help you today?",
-          sender: "bot" as const,
-          timestamp: new Date(),
-          complete: true,
-        };
-        formattedMessages.push(initialMessage);
-        newDisplayedContents[initialMessageId] = initialMessage.content;
+        // Add initial greeting message only if no messages exist yet
+        if (formattedMessages.length === 0) {
+          const initialMessageId = "initial";
+          const initialMessage = {
+            id: initialMessageId,
+            content:
+              "👋 Hi there! I'm your music companion. How can I help you today?",
+            sender: "bot" as const,
+            timestamp: new Date(),
+            complete: true,
+          };
+          formattedMessages.push(initialMessage);
+          newDisplayedContents[initialMessageId] = initialMessage.content;
+        }
+
+        // Set flag to prevent processing initialUserMessage again
+        setInitialMessageProcessed(true);
+
+        // Track which messages we've processed to avoid duplicates
+        const processedQueries = new Set();
 
         sortedData.forEach((item, index) => {
+          // Prevent duplicate messages by checking if we've seen this query before
+          if (processedQueries.has(item.query)) {
+            return;
+          }
+          processedQueries.add(item.query);
+
           // Add user message (query)
           const userMsgId = `history-user-${index}`;
           const userMsg = {
@@ -263,8 +303,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
             formattedMessages.push(botMsg);
             newDisplayedContents[botMsgId] = botMsg.content;
           }
-          // If there's no response, we don't add any processing message
-          // The loading indicator will be shown if isTyping is true
         });
 
         setMessages(formattedMessages);
@@ -282,13 +320,26 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
-  // Handle send message with TanStack Query
+  // Handle send message with TanStack Query - with duplicate message prevention
   const handleSendMessage = async (customMessage?: string) => {
     const messageToSend = customMessage || inputValue;
     if (messageToSend.trim() === "" || isTyping) return;
 
     const messageId = `msg-${Date.now()}`;
     const userMessageId = `user-${messageId}`;
+
+    // Check for recent duplicate messages to prevent double-sends
+    const isDuplicate = messages.some(
+      (msg) =>
+        msg.sender === "user" &&
+        msg.content === messageToSend &&
+        Date.now() - msg.timestamp.getTime() < 5000
+    );
+
+    if (isDuplicate) {
+      console.log("Duplicate message detected, ignoring:", messageToSend);
+      return;
+    }
 
     // Add user message
     const userMessage: Message = {
@@ -312,7 +363,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     setIsTyping(true);
 
     try {
-      // Wait for API response
       const response = await sendMessageMutation.mutateAsync({
         question: messageToSend,
         mode: currentMode,
@@ -320,26 +370,20 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         user_id: user?.id || userId,
       });
 
-      // First stop the typing indicator
-      setIsTyping(false);
+      const botMessageId = `bot-${messageId}`;
+      const botMessage: Message = {
+        id: botMessageId,
+        content: response.response,
+        sender: "bot",
+        timestamp: new Date(),
+        complete: false, // Start with typing effect
+      };
 
-      // Short delay before showing bot's response bubble
-      setTimeout(() => {
-        const botMessageId = `bot-${messageId}`;
-        const botMessage: Message = {
-          id: botMessageId,
-          content: response.response,
-          sender: "bot",
-          timestamp: new Date(),
-          complete: false, // Start with typing effect
-        };
-
-        setMessages((prevMessages) => [...prevMessages, botMessage]);
-        setDisplayedContents((prev) => ({
-          ...prev,
-          [botMessageId]: "",
-        }));
-      }, 300); // Small delay before showing response bubble
+      setMessages((prevMessages) => [...prevMessages, botMessage]);
+      setDisplayedContents((prev) => ({
+        ...prev,
+        [botMessageId]: "",
+      }));
     } catch (error) {
       console.error("Error in chat flow:", error);
 
@@ -364,7 +408,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
-  // Typing effect useEffect with more natural typing behavior
+  // Typing effect useEffect
   useEffect(() => {
     // Find the latest bot message that isn't complete
     const incompleteMessage = messages.find(
@@ -377,53 +421,18 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
       // If we haven't displayed the full message yet
       if (currentContent.length < incompleteMessage.content.length) {
-        // Initial delay before bot starts typing
-        if (currentContent.length === 0) {
-          const initialDelay = setTimeout(() => {
-            // Add the first character after a delay to simulate "thinking"
-            setDisplayedContents((prev) => ({
-              ...prev,
-              [incompleteMessage.id]: incompleteMessage.content.charAt(0),
-            }));
-          }, 800); // 800ms initial delay before typing starts
-
-          return () => clearTimeout(initialDelay);
-        }
-
-        // Set a timeout to add the next characters
+        // Set a timeout to add the next character
         const timer = setTimeout(() => {
-          // Get next chunk size (1-3 characters at a time for more natural typing)
-          const chunkSize = Math.floor(Math.random() * 3) + 1;
-          const endIndex = Math.min(
-            currentContent.length + chunkSize,
-            incompleteMessage.content.length
-          );
-
-          // Add the next chunk of characters
-          const nextChunk = incompleteMessage.content.substring(
-            currentContent.length,
-            endIndex
-          );
-          const newContent = currentContent + nextChunk;
+          // Add the next character
+          const nextChar = incompleteMessage.content[currentContent.length];
+          const newContent = currentContent + nextChar;
 
           // Update the displayed content for this message
           setDisplayedContents((prev) => ({
             ...prev,
             [incompleteMessage.id]: newContent,
           }));
-
-          // Determine next typing speed based on content
-          const isPunctuation = /[.,!?]/.test(nextChunk);
-          const nextDelay = isPunctuation
-            ? Math.random() * 300 + 150 // Longer pause at punctuation
-            : Math.random() * 40 + 10; // Regular typing speed
-
-          // Schedule the next chunk immediately
-          setTimeout(() => {
-            // This forces a re-render that will trigger this useEffect again
-            setDisplayedContents((prev) => ({ ...prev }));
-          }, nextDelay);
-        }, 15); // Initial chunk delay
+        }, 15); // Adjust typing speed (milliseconds per character)
 
         return () => clearTimeout(timer);
       } else {
