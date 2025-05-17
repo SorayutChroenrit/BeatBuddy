@@ -1,4 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import axios from "axios";
+
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+
+const api = axios.create({
+  baseURL: API_URL,
+  withCredentials: true,
+});
 
 interface User {
   id: string;
@@ -29,17 +37,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const checkSession = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/auth/session", {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const session = await response.json();
-        setUser(session?.user || null);
-      } else {
-        setUser(null);
-      }
+      const response = await api.get("/api/auth/session");
+      setUser(response.data?.user || null);
     } catch (error) {
       console.error("Error checking session:", error);
       setUser(null);
@@ -56,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem("authReturnUrl", returnUrl);
 
       // Redirect to auth endpoint
-      window.location.href = `http://localhost:8000/api/auth/signin/${provider}`;
+      window.location.href = `${API_URL}/api/auth/signin/${provider}`;
     } catch (error) {
       console.error("Error signing in:", error);
       throw error;
@@ -65,17 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const signOut = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/auth/signout", {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        setUser(null);
-        window.location.href = "/#/login";
-      } else {
-        throw new Error("Failed to sign out");
-      }
+      await api.post("/api/auth/signout");
+      setUser(null);
+      window.location.href = "/#/login";
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;
