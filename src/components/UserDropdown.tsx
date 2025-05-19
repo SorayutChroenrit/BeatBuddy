@@ -188,7 +188,9 @@ const UserDropdown = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleSignOut}
               className="bg-red-600 hover:bg-red-700 text-white"

@@ -170,7 +170,33 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     messages.length,
   ]);
 
-  // CRITICAL FIX: Direct handler for initial message
+  // Function to create a bot message with forced typing
+  const createBotMessageWithTyping = (
+    content: string,
+    messageId: string = `bot-${Date.now()}`
+  ) => {
+    // Create bot message and explicitly mark as incomplete
+    const botMessage: Message = {
+      id: messageId,
+      content: content,
+      sender: "bot",
+      timestamp: new Date(),
+      complete: false, // Always start as false to enable typing effect
+    };
+
+    // Add the message to the messages array
+    setMessages((prevMessages) => [...prevMessages, botMessage]);
+
+    // Initialize the displayed content as an empty string
+    setDisplayedContents((prev) => ({
+      ...prev,
+      [messageId]: "",
+    }));
+
+    return messageId;
+  };
+
+  // CRITICAL FIX: Direct handler for initial message with the improved approach
   useEffect(() => {
     const handleInitialMessage = async () => {
       if (
@@ -200,7 +226,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         try {
           setIsTyping(true);
           setApiCallInProgress(true);
-
           apiCallAttemptsRef.current += 1;
 
           const response = await sendMessageMutation.mutateAsync({
@@ -211,21 +236,11 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           });
 
           if (isMountedRef.current) {
-            // Add bot response with typing effect
-            const botMessageId = `bot-direct-${Date.now()}`;
-            const botMessage: Message = {
-              id: botMessageId,
-              content: response.response,
-              sender: "bot",
-              timestamp: new Date(),
-              complete: false, // Start as incomplete to allow typing effect
-            };
-
-            setMessages((prev) => [...prev, botMessage]);
-            setDisplayedContents((prev) => ({
-              ...prev,
-              [botMessageId]: "", // Start with empty string for typing effect
-            }));
+            // Use the helper function for consistent message creation
+            createBotMessageWithTyping(
+              response.response,
+              `bot-direct-${Date.now()}`
+            );
           }
         } catch (error) {
           if (isMountedRef.current) {
@@ -346,7 +361,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
               content: item.response,
               sender: "bot" as const,
               timestamp: new Date(item.created_at),
-              complete: true, // Historical messages are complete
+              complete: true,
             };
             formattedMessages.push(botMsg);
 
@@ -369,7 +384,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
-  // CRITICAL FIX: Direct function for sending messages to API
   const sendMessageToAPI = async (
     message: string,
     mode: BotMode,
@@ -393,25 +407,8 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       });
 
       if (isMountedRef.current) {
-        const botMessageId = `bot-${Date.now()}`;
-
-        // Create bot message and explicitly mark as incomplete
-        const botMessage: Message = {
-          id: botMessageId,
-          content: response.response,
-          sender: "bot",
-          timestamp: new Date(),
-          complete: false, // Always start as false to enable typing effect
-        };
-
-        // Add the message to the messages array
-        setMessages((prevMessages) => [...prevMessages, botMessage]);
-
-        // Initialize the displayed content as an empty string
-        setDisplayedContents((prev) => ({
-          ...prev,
-          [botMessageId]: "",
-        }));
+        // Use the new helper function to create a bot message with typing
+        createBotMessageWithTyping(response.response);
       }
     } catch (error) {
       if (isMountedRef.current) {
@@ -456,7 +453,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
 
     if (messageToSend === lastSentMessageRef.current || isDuplicate) {
-      console.log("Duplicate message detected, ignoring:", messageToSend);
       return;
     }
 
@@ -492,12 +488,20 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
   };
 
-  // REVISED: Typing effect that properly types until the end
+  // REVISED: Improved typing effect that properly types until the end
   useEffect(() => {
-    // Find the latest bot message that isn't complete
-    const incompleteMessage = messages.find(
-      (msg) => msg.sender === "bot" && !msg.complete
+    // Find all incomplete bot messages
+    const incompleteMessages = messages.filter(
+      (msg) => msg.sender === "bot" && msg.complete === false
     );
+
+    // Process only one message at a time - the oldest incomplete message
+    const incompleteMessage =
+      incompleteMessages.length > 0
+        ? incompleteMessages.sort(
+            (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+          )[0]
+        : null;
 
     if (incompleteMessage) {
       // Get the current displayed content or initialize it
