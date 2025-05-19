@@ -282,7 +282,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   }, [mode]);
 
   // Function to process session data
-  const fetchSessionData = async (id: string) => {
+  const fetchSessionData = async (_id: string) => {
     setLoading(true);
 
     try {
