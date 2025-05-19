@@ -1,6 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ArrowRight, Music } from "lucide-react";
-
+import {
+  ArrowRight,
+  Music,
+  Sparkles,
+  Book,
+  Heart,
+  History,
+  Plus,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import Sidebar from "../components/Sidebar";
@@ -16,6 +24,26 @@ const HomePage: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isNavigatingRef = useRef(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Example suggestions based on mode
+  const suggestions = {
+    fun: [
+      "Tell me a fun fact about The Beatles",
+      "What's the most sampled song in history?",
+      "Recommend me some interesting music from the 80s",
+    ],
+    mentor: [
+      "Help me understand chord progressions",
+      "What scales should I practice as a beginner?",
+      "How do I improve my music theory knowledge?",
+    ],
+    buddy: [
+      "I'm feeling stuck with my practice routine",
+      "How do I stay motivated to practice?",
+      "Give me some encouraging music quotes",
+    ],
+  };
 
   // Focus input when component loads
   useEffect(() => {
@@ -50,11 +78,7 @@ const HomePage: React.FC = () => {
     // Generate a session ID
     const newSessionId = uuidv4();
 
-    console.log(
-      `Starting chat with message: "${initialMessage}" and mode: ${currentMode}`
-    );
-
-    // CRITICAL FIX: Store initial message and mode in localStorage properly
+    // Store initial message and mode in localStorage properly
     try {
       localStorage.setItem(
         `chat_initial_message_${newSessionId}`,
@@ -62,18 +86,8 @@ const HomePage: React.FC = () => {
       );
       localStorage.setItem(`chat_initial_mode_${newSessionId}`, currentMode);
 
-      console.log("Stored message in localStorage:", initialMessage.trim());
-      console.log("Stored mode in localStorage:", currentMode);
-      console.log("Storage key:", `chat_initial_message_${newSessionId}`);
-
       // Add a forced delay to ensure localStorage updates before navigation
       setTimeout(() => {
-        // Verify the message was stored properly
-        const verifyMessage = localStorage.getItem(
-          `chat_initial_message_${newSessionId}`
-        );
-        console.log("Verification - message in localStorage:", verifyMessage);
-
         // Navigate to chat page
         navigate(`/chat/${newSessionId}`);
       }, 100);
@@ -92,6 +106,8 @@ const HomePage: React.FC = () => {
     setCurrentMode(mode);
     // Focus input after selecting mode
     setTimeout(() => inputRef.current?.focus(), 0);
+    // Show suggestions when changing modes
+    setShowSuggestions(true);
   };
 
   const handleSessionSelect = (sessionId: string) => {
@@ -112,128 +128,291 @@ const HomePage: React.FC = () => {
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
+  const handleSuggestionClick = (suggestion: string) => {
+    setInitialMessage(suggestion);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
   // Mode card component
   const ModeCard = ({
     mode,
     title,
     description,
     colorClasses,
+    icon,
     onClick,
   }: {
     mode: "fun" | "mentor" | "buddy";
     title: string;
     description: string;
     colorClasses: string;
+    icon: React.ReactNode;
     onClick: () => void;
   }) => (
-    <button onClick={onClick} className="text-left w-full focus:outline-none">
-      <div
-        className={`bg-white p-4 rounded-lg shadow-sm transition-colors ${
+    <motion.button
+      onClick={onClick}
+      className="text-left w-full focus:outline-none"
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.2 }}
+    >
+      <motion.div
+        className={`bg-white p-5 rounded-xl shadow-sm transition-all ${
           currentMode === mode
-            ? `ring-2 ${colorClasses}`
+            ? `ring-2 ${colorClasses} shadow-md`
             : `hover:ring-1 hover:${colorClasses.replace("ring-", "ring-")}`
         }`}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
       >
-        <h3
-          className={`font-semibold text-lg mb-2 ${colorClasses.replace(
-            "ring-",
-            "text-"
-          )}`}
-        >
-          {title}
-        </h3>
-        <p className="text-gray-600">{description}</p>
-      </div>
-    </button>
+        <div className="flex items-start gap-3">
+          <div
+            className={`p-2 rounded-lg ${colorClasses
+              .replace("ring-", "bg-")
+              .replace("400", "100")}`}
+          >
+            {icon}
+          </div>
+          <div>
+            <h3
+              className={`font-semibold text-lg mb-1 ${colorClasses
+                .replace("ring-", "text-")
+                .replace("400", "600")}`}
+            >
+              {title}
+            </h3>
+            <p className="text-gray-600 text-sm">{description}</p>
+          </div>
+        </div>
+      </motion.div>
+    </motion.button>
   );
 
+  // Main page animations
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: "easeOut" },
+    },
+  };
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <Sidebar
         currentMode={currentMode}
         onModeChange={handleModeChange}
         onSessionSelect={handleSessionSelect}
         onNewChat={handleNewChat}
       />
+
       <div className="flex-1 overflow-auto">
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-gray-100 to-gray-200 p-4">
-          <div className="max-w-2xl w-full flex flex-col items-center">
+        <motion.div
+          className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <div className="max-w-3xl w-full flex flex-col items-center">
             {/* Logo and Title */}
-            <div className="flex items-center gap-3 mb-8">
-              <div className="bg-indigo-500 p-2 rounded-full">
+            <motion.div
+              className="flex items-center gap-3 mb-8"
+              variants={itemVariants}
+            >
+              <motion.div
+                className="bg-indigo-600 p-3 rounded-full shadow-lg"
+                whileHover={{ scale: 1.1, rotate: 5 }}
+                transition={{ type: "spring", stiffness: 400, damping: 10 }}
+              >
                 <Music className="h-8 w-8 text-white" />
-              </div>
-              <h1 className="text-3xl font-bold text-center">Beat Buddy</h1>
-            </div>
+              </motion.div>
+              <h1 className="text-3xl font-bold text-gray-800">BeatBudd</h1>
+            </motion.div>
 
             {/* Welcome Message */}
-            <h2 className="text-2xl md:text-4xl font-semibold text-center mb-6">
-              <span className="text-indigo-500">♪</span> How can I help with
+            <motion.h2
+              className="text-2xl md:text-4xl font-semibold text-center mb-4 text-gray-800"
+              variants={itemVariants}
+            >
+              <span className="text-indigo-600">♪</span> How can I help with
               your music today?
-            </h2>
+            </motion.h2>
 
-            <p className="text-lg text-gray-600 text-center mb-8">
-              Your AI music companion for recommendations, practice advice, and
-              fun facts
-            </p>
+            <motion.p
+              className="text-lg text-gray-600 text-center mb-8"
+              variants={itemVariants}
+            >
+              Your AI music companion for lyrics, song identification, and
+              musical knowledge
+            </motion.p>
 
             {/* Input Box */}
-            <div className="w-full bg-white rounded-lg shadow-md p-6 mb-6">
+            <motion.div
+              className="w-full bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-100"
+              variants={itemVariants}
+            >
               <Textarea
                 ref={inputRef}
                 value={initialMessage}
                 onChange={(e) => setInitialMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask about music, theory, or get recommendations..."
-                className="min-h-20 resize-none text-lg mb-4 p-4"
+                placeholder="Ask about song lyrics, identify tracks, or learn about music..."
+                className="min-h-24 resize-none text-lg mb-4 p-4 rounded-lg border-gray-200 focus:ring-indigo-500 focus:border-indigo-500"
                 rows={3}
               />
 
-              <div className="flex justify-end">
+              {/* Suggestions */}
+              <AnimatePresence>
+                {showSuggestions && (
+                  <motion.div
+                    className="mb-4"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <p className="text-sm text-gray-500 mb-2">Try asking:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestions[currentMode].map((suggestion, index) => (
+                        <motion.button
+                          key={index}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="text-sm py-1 px-3 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          {suggestion}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex justify-between items-center">
+                <Button
+                  onClick={() => setShowSuggestions(!showSuggestions)}
+                  size="sm"
+                  variant="outline"
+                  className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                >
+                  {showSuggestions ? "Hide suggestions" : "Show suggestions"}
+                </Button>
+
                 <Button
                   onClick={handleStartChat}
                   size="lg"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
                   disabled={!initialMessage.trim() || isSubmitting}
                 >
                   {isSubmitting ? (
-                    "Starting chat..."
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                      className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                    />
                   ) : (
-                    <>
+                    <motion.div
+                      className="flex items-center"
+                      whileHover={{ x: 5 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 10,
+                      }}
+                    >
                       Let's talk about music{" "}
                       <ArrowRight className="ml-2 h-5 w-5" />
-                    </>
+                    </motion.div>
                   )}
                 </Button>
               </div>
-            </div>
+            </motion.div>
 
             {/* Mode Selection Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full"
+              variants={itemVariants}
+            >
               <ModeCard
                 mode="fun"
                 title="Fun Mode"
-                description="Get fun facts and light conversation about music"
+                description="Get lyrics and fun facts about your favorite music"
                 colorClasses="ring-purple-400"
+                icon={<Sparkles className="h-5 w-5 text-purple-500" />}
                 onClick={() => handleModeSelect("fun")}
               />
               <ModeCard
                 mode="mentor"
                 title="Expert Mode"
-                description="Receive technical advice and learning resources"
+                description="Identify songs and get detailed musical knowledge"
                 colorClasses="ring-blue-400"
+                icon={<Book className="h-5 w-5 text-blue-500" />}
                 onClick={() => handleModeSelect("mentor")}
               />
               <ModeCard
                 mode="buddy"
                 title="Buddy Mode"
-                description="Get encouragement and support for your musical journey"
+                description="Get recommendations and build your musical journey"
                 colorClasses="ring-green-400"
+                icon={<Heart className="h-5 w-5 text-green-500" />}
                 onClick={() => handleModeSelect("buddy")}
               />
-            </div>
+            </motion.div>
+
+            {/* Recent Chats */}
+            <motion.div className="w-full mt-8" variants={itemVariants}>
+              <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+                <History className="h-4 w-4 mr-2" />
+                Continue a recent conversation
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <motion.button
+                    key={index}
+                    className="p-3 bg-white rounded-lg border border-gray-200 text-left hover:bg-gray-50 hover:border-indigo-200 transition-colors"
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <p className="text-sm font-medium text-gray-700 truncate">
+                      About jazz improvisation
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Yesterday at 3:24 PM
+                    </p>
+                  </motion.button>
+                ))}
+                <motion.button
+                  className="p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-left hover:bg-indigo-100 transition-colors flex items-center justify-center"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleNewChat}
+                >
+                  <Plus className="h-4 w-4 mr-2 text-indigo-600" />
+                  <span className="text-sm font-medium text-indigo-600">
+                    New Chat
+                  </span>
+                </motion.button>
+              </div>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
