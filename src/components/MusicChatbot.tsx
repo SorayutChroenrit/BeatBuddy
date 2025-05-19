@@ -493,7 +493,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
   };
 
-  // IMPROVED: Natural, human-like typing effect with consistent speed regardless of message length
   useEffect(() => {
     // Find all incomplete bot messages
     const incompleteMessages = messages.filter(
@@ -515,12 +514,38 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
       // If we haven't displayed the full message yet
       if (currentContent.length < fullContent.length) {
-        // Set a timeout to add the next character
+        // Set a timeout to add characters
         const timer = setTimeout(() => {
-          // Always add just one character at a time for more realistic typing
-          // This ensures consistent typing speed regardless of message length
-          const nextChar = fullContent.charAt(currentContent.length);
-          const newContent = currentContent + nextChar;
+          // Calculate how many characters to add based on message length and progress
+          // This makes short messages type at a reasonable pace and long messages go faster
+
+          // Get total message length
+          const totalLength = fullContent.length;
+
+          // Base number of characters to add per tick
+          let charsToAdd = 1;
+
+          // For longer messages, increase typing speed
+          if (totalLength > 200) {
+            // For very long messages, add more characters at once
+            // This formula adds more characters as the message gets longer
+            charsToAdd = Math.max(1, Math.floor(totalLength / 100));
+
+            // Further increase speed as we progress through the message
+            // This creates a ramp-up effect where typing gets faster as it goes
+            if (currentContent.length > totalLength * 0.3) {
+              charsToAdd = Math.max(charsToAdd, Math.floor(totalLength / 80));
+            }
+          }
+
+          // Make sure we don't exceed the message length
+          const endIndex = Math.min(
+            currentContent.length + charsToAdd,
+            fullContent.length
+          );
+
+          // Get the next chunk of text to add
+          const newContent = fullContent.substring(0, endIndex);
 
           // Update the displayed content for this message
           setDisplayedContents((prev) => ({
@@ -528,13 +553,12 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
             [incompleteMessage.id]: newContent,
           }));
 
-          // Randomize the typing speed slightly to appear more human-like
-          // Base typing speed is 50-120ms per character
-        }, Math.random() * 70 + 50);
+          // Base speed of 30ms per update with small random variation
+        }, 30 + Math.random() * 5); // 30-35ms per update
 
         return () => clearTimeout(timer);
       } else {
-        // IMPORTANT: Mark as complete after fully typed
+        // Mark as complete after fully typed
         console.log(
           "Message fully typed, marking as complete:",
           incompleteMessage.id
