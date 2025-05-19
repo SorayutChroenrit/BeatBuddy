@@ -190,7 +190,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     // Initialize the displayed content as an empty string
     setDisplayedContents((prev) => ({
       ...prev,
-      [messageId]: "",
+      [messageId]: "", // Start with empty string for typing effect
     }));
 
     return messageId;
@@ -243,6 +243,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
             );
           }
         } catch (error) {
+          console.error("Initial message API error:", error);
           if (isMountedRef.current) {
             // Add error message
             const errorMessageId = `error-direct-${Date.now()}`;
@@ -264,7 +265,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         } finally {
           if (isMountedRef.current) {
             setIsTyping(false);
-            setApiCallInProgress(false);
+            setApiCallInProgress(false); // CRITICAL: Always reset this flag
           }
         }
       }
@@ -279,6 +280,8 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     sessionId,
     user?.id,
     userId,
+    initialMessageProcessed,
+    apiCallInProgress,
   ]);
 
   // Process session data
@@ -378,12 +381,14 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         }
       }
     } catch (error) {
+      console.error("Error fetching session data:", error);
       // Handle error silently
     } finally {
       setLoading(false);
     }
   };
 
+  // FIXED: Send message to API function with proper state handling
   const sendMessageToAPI = async (
     message: string,
     mode: BotMode,
@@ -391,6 +396,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     user_id: string
   ) => {
     if (apiCallInProgress) {
+      console.log("API call already in progress, blocking new request");
       return;
     }
 
@@ -399,6 +405,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     apiCallAttemptsRef.current += 1;
 
     try {
+      console.log("Sending message to API:", message);
       const response = await sendMessageMutation.mutateAsync({
         question: message,
         mode: mode,
@@ -407,10 +414,12 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       });
 
       if (isMountedRef.current) {
-        // Use the new helper function to create a bot message with typing
+        console.log("API response received:", response);
+        // Use the helper function for consistent message creation
         createBotMessageWithTyping(response.response);
       }
     } catch (error) {
+      console.error("API call failed:", error);
       if (isMountedRef.current) {
         const errorMessageId = `error-${Date.now()}`;
         const errorMessage: Message = {
@@ -430,16 +439,27 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       }
     } finally {
       if (isMountedRef.current) {
+        console.log("API call completed, resetting state flags");
         setIsTyping(false);
-        setApiCallInProgress(false);
+        setApiCallInProgress(false); // CRITICAL: Always reset this flag
       }
     }
   };
 
-  // Handle UI send message
+  // FIXED: Handle UI send message with better state management
   const handleSendMessage = async (customMessage?: string) => {
     const messageToSend = customMessage || inputValue;
-    if (messageToSend.trim() === "" || isTyping || apiCallInProgress) return;
+
+    // Return early if conditions are not met
+    if (messageToSend.trim() === "") {
+      console.log("Empty message, not sending");
+      return;
+    }
+
+    if (isTyping || apiCallInProgress) {
+      console.log("Typing or API call in progress, not sending");
+      return;
+    }
 
     const messageId = `msg-${Date.now()}`;
     const userMessageId = `user-${messageId}`;
@@ -453,6 +473,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
 
     if (messageToSend === lastSentMessageRef.current || isDuplicate) {
+      console.log("Duplicate message detected, not sending");
       return;
     }
 
@@ -480,7 +501,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     if (!customMessage) setInputValue("");
 
     // Send to API
-    sendMessageToAPI(
+    await sendMessageToAPI(
       messageToSend,
       currentMode,
       selectedSessionId || sessionId,
@@ -488,7 +509,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
   };
 
-  // REVISED: Improved typing effect that properly types until the end
+  // IMPROVED: Typing effect that properly types until the end of the message
   useEffect(() => {
     // Find all incomplete bot messages
     const incompleteMessages = messages.filter(
@@ -506,13 +527,14 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     if (incompleteMessage) {
       // Get the current displayed content or initialize it
       const currentContent = displayedContents[incompleteMessage.id] || "";
+      const fullContent = incompleteMessage.content;
 
       // If we haven't displayed the full message yet
-      if (currentContent.length < incompleteMessage.content.length) {
+      if (currentContent.length < fullContent.length) {
         // Set a timeout to add the next character
         const timer = setTimeout(() => {
           // Add the next character
-          const nextChar = incompleteMessage.content[currentContent.length];
+          const nextChar = fullContent[currentContent.length];
           const newContent = currentContent + nextChar;
 
           // Update the displayed content for this message
@@ -524,7 +546,11 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
         return () => clearTimeout(timer);
       } else {
-        // Message is complete, mark it as such ONLY when typing is finished
+        // IMPORTANT: Only mark as complete after fully typed
+        console.log(
+          "Message fully typed, marking as complete:",
+          incompleteMessage.id
+        );
         setMessages((prevMessages) =>
           prevMessages.map((msg) =>
             msg.id === incompleteMessage.id ? { ...msg, complete: true } : msg
@@ -551,6 +577,8 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       // Only send if not already in progress
       if (!isTyping && !apiCallInProgress) {
         handleSendMessage();
+      } else {
+        console.log("Not sending on Enter: typing or API call in progress");
       }
     }
   };
@@ -569,6 +597,16 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
   // Check if we should show the image or fallback
   const shouldShowFallback = imageError || !imageUrl;
+
+  // Debug logging for component state
+  useEffect(() => {
+    console.log("Component state:", {
+      isTyping,
+      apiCallInProgress,
+      messagesCount: messages.length,
+      incompleteMessages: messages.filter((msg) => !msg.complete).length,
+    });
+  }, [isTyping, apiCallInProgress, messages]);
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
