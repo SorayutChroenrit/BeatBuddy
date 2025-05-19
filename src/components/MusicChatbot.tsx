@@ -170,6 +170,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     messages.length,
   ]);
 
+  // Function to create a bot message with forced typing
   const createBotMessageWithTyping = (
     content: string,
     messageId: string = `bot-${Date.now()}`
@@ -192,12 +193,10 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       [messageId]: "", // Start with empty string for typing effect
     }));
 
-    setIsTyping(true);
-
     return messageId;
   };
 
-  // CRITICAL FIX: Direct handler for initial message with the improved approach
+  // Handle initial message with the improved approach
   useEffect(() => {
     const handleInitialMessage = async () => {
       if (
@@ -265,7 +264,8 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           }
         } finally {
           if (isMountedRef.current) {
-            setApiCallInProgress(false);
+            setIsTyping(false);
+            setApiCallInProgress(false); // CRITICAL: Always reset this flag
           }
         }
       }
@@ -299,7 +299,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     setCurrentMode(mode as BotMode);
   }, [mode]);
 
-  // Function to process session data
+  // Function to process session data - UPDATED to remove message deduplication
   const fetchSessionData = async (_id: string) => {
     setLoading(true);
 
@@ -339,14 +339,9 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         }
 
         setInitialMessageProcessed(true);
-        const processedQueries = new Set();
 
+        // Process each message in chronological order without deduplication
         sortedData.forEach((item, index) => {
-          if (processedQueries.has(item.query)) {
-            return;
-          }
-          processedQueries.add(item.query);
-
           const userMsgId = `history-user-${index}`;
           const userMsg = {
             id: userMsgId,
@@ -388,6 +383,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
+  // Send message to API function with proper state handling
   const sendMessageToAPI = async (
     message: string,
     mode: BotMode,
@@ -414,7 +410,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
       if (isMountedRef.current) {
         console.log("API response received:", response);
-        // Create the bot message with typing effect, but don't turn off isTyping yet
+        // Use the helper function for consistent message creation
         createBotMessageWithTyping(response.response);
       }
     } catch (error) {
@@ -435,21 +431,17 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           ...prev,
           [errorMessageId]: errorMessage.content,
         }));
-
-        // Only turn off typing for errors
-        setIsTyping(false);
       }
     } finally {
       if (isMountedRef.current) {
-        console.log("API call completed, resetting API flag only");
-        // ONLY reset the API call in progress flag, but NOT the isTyping flag
-        setApiCallInProgress(false);
-        // Do NOT set isTyping to false here! It will be managed by typing effect
+        console.log("API call completed, resetting state flags");
+        setIsTyping(false);
+        setApiCallInProgress(false); // CRITICAL: Always reset this flag
       }
     }
   };
 
-  // FIXED: Handle UI send message with better state management
+  // Handle UI send message with better state management
   const handleSendMessage = async (customMessage?: string) => {
     const messageToSend = customMessage || inputValue;
 
@@ -467,9 +459,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
     const messageId = `msg-${Date.now()}`;
     const userMessageId = `user-${messageId}`;
-
-    // REMOVED: The duplicate message check
-    // This allows users to send the same message multiple times
 
     // Update lastSentMessageRef for debugging purposes only
     lastSentMessageRef.current = messageToSend;
@@ -504,6 +493,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
   };
 
+  // IMPROVED: Natural, human-like typing effect with consistent speed regardless of message length
   useEffect(() => {
     // Find all incomplete bot messages
     const incompleteMessages = messages.filter(
@@ -525,24 +515,12 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
       // If we haven't displayed the full message yet
       if (currentContent.length < fullContent.length) {
-        // Set a timeout to add the next characters
+        // Set a timeout to add the next character
         const timer = setTimeout(() => {
-          // IMPORTANT: Use a consistent, human-like typing speed
-          // For a more human-like effect, vary the characters added slightly
-          const baseCharsPerInterval = 1; // Only 1 character at a time for very human-like typing
-
-          // Add a slight natural variation (1-2 chars per interval)
-          const variation = Math.floor(Math.random() * 2); // 0 or 1
-          const charsToAdd = baseCharsPerInterval + variation;
-
-          // Make sure we don't exceed the message length
-          const endIndex = Math.min(
-            currentContent.length + charsToAdd,
-            fullContent.length
-          );
-
-          // Get the new content to display
-          const newContent = fullContent.substring(0, endIndex);
+          // Always add just one character at a time for more realistic typing
+          // This ensures consistent typing speed regardless of message length
+          const nextChar = fullContent.charAt(currentContent.length);
+          const newContent = currentContent + nextChar;
 
           // Update the displayed content for this message
           setDisplayedContents((prev) => ({
@@ -550,14 +528,9 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
             [incompleteMessage.id]: newContent,
           }));
 
-          // Log progress for debugging (optional)
-          if (endIndex % 50 === 0 || endIndex === fullContent.length) {
-            console.log(
-              `Typing progress: ${endIndex}/${fullContent.length} characters`
-            );
-          }
-        }, 60); // SLOWER interval - 60ms gives a more natural, human typing speed
-        // Approximately 15-20 characters per second
+          // Randomize the typing speed slightly to appear more human-like
+          // Base typing speed is 50-120ms per character
+        }, Math.random() * 70 + 50);
 
         return () => clearTimeout(timer);
       } else {
@@ -574,15 +547,9 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           )
         );
       }
-    } else if (isTyping) {
-      // CRITICAL FIX: If there are no incomplete messages but isTyping is true,
-      // it means typing has finished, so turn off the typing indicator
-      console.log(
-        "No incomplete messages remaining, turning off typing indicator"
-      );
-      setIsTyping(false);
     }
-  }, [messages, displayedContents, isTyping]);
+  }, [messages, displayedContents]);
+
   // Auto-scroll to bottom when new messages come in
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
