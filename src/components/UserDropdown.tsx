@@ -9,14 +9,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { useAuth } from "../lib/auth";
 import { useState, useEffect } from "react";
 
 const UserDropdown = () => {
   const { user, signOut } = useAuth();
   const [imageError, setImageError] = useState(false);
-  // Fix: Properly type the imageUrl state as string | null
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [showLogoutAlert, setShowLogoutAlert] = useState(false);
 
   useEffect(() => {
     // Reset states when user changes
@@ -71,97 +81,124 @@ const UserDropdown = () => {
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 p-2 rounded-md w-full transition-colors hover:bg-gray-50">
-          <Avatar className="h-8 w-8">
-            {imageUrl && !imageError ? (
-              <AvatarImage
-                src={imageUrl}
-                alt={getUserName()}
-                onError={handleImageError}
-                crossOrigin="anonymous"
-              />
-            ) : null}
-            <AvatarFallback className="bg-indigo-100 text-indigo-700">
-              {getInitials()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-grow text-left">
-            <p className="text-sm font-medium text-gray-900">{getUserName()}</p>
-          </div>
-          <ChevronDown className="h-4 w-4 text-gray-600" />
-        </button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent className="w-56" align="end">
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{getUserName()}</p>
-            <p className="text-xs leading-none text-gray-500">{user.email}</p>
-          </div>
-        </DropdownMenuLabel>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6">
-                {imageUrl && !imageError ? (
-                  <AvatarImage
-                    src={imageUrl}
-                    alt={getUserName()}
-                    onError={handleImageError}
-                    crossOrigin="anonymous"
-                  />
-                ) : null}
-                <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs">
-                  {getInitials()}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-sm">Personal Account</p>
-              </div>
-              <div className="ml-auto">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 6L9 17L4 12"
-                    stroke="#3B82F6"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-2 p-2 rounded-md w-full transition-colors hover:bg-gray-50">
+            <Avatar className="h-8 w-8">
+              {imageUrl && !imageError ? (
+                <AvatarImage
+                  src={imageUrl}
+                  alt={getUserName()}
+                  onError={handleImageError}
+                  crossOrigin="anonymous"
+                />
+              ) : null}
+              <AvatarFallback className="bg-indigo-100 text-indigo-700">
+                {getInitials()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-grow text-left">
+              <p className="text-sm font-medium text-gray-900">
+                {getUserName()}
+              </p>
             </div>
+            <ChevronDown className="h-4 w-4 text-gray-600" />
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent className="w-56" align="end">
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-medium leading-none">
+                {getUserName()}
+              </p>
+              <p className="text-xs leading-none text-gray-500">{user.email}</p>
+            </div>
+          </DropdownMenuLabel>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuGroup>
+            <DropdownMenuItem>
+              <div className="flex items-center gap-2">
+                <Avatar className="h-6 w-6">
+                  {imageUrl && !imageError ? (
+                    <AvatarImage
+                      src={imageUrl}
+                      alt={getUserName()}
+                      onError={handleImageError}
+                      crossOrigin="anonymous"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs">
+                    {getInitials()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm">Personal Account</p>
+                </div>
+                <div className="ml-auto">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M20 6L9 17L4 12"
+                      stroke="#3B82F6"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem className="cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Settings</span>
           </DropdownMenuItem>
-        </DropdownMenuGroup>
 
-        <DropdownMenuSeparator />
+          <DropdownMenuSeparator />
 
-        <DropdownMenuItem className="cursor-pointer">
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
-        </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-red-600 cursor-pointer focus:text-red-600"
+            onClick={() => setShowLogoutAlert(true)}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Log out</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem
-          className="text-red-600 cursor-pointer focus:text-red-600"
-          onClick={handleSignOut}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      <AlertDialog open={showLogoutAlert} onOpenChange={setShowLogoutAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out? You'll need to sign in again to
+              access your account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSignOut}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Log out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
