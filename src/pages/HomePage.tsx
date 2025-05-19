@@ -8,7 +8,7 @@ import {
   History,
   MessageSquare,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import Sidebar from "../components/Sidebar";
@@ -120,8 +120,23 @@ const HomePage: React.FC = () => {
 
     return Array.from(sessionsMap.values())
       .sort((a, b) => b.lastMessageDate.getTime() - a.lastMessageDate.getTime())
-      .slice(0, 3);
+      .slice(0, 3); // Get only the 3 most recent sessions
   }, [chatHistoryData, formatDate]);
+
+  // Use the same suggestions for all modes
+  const commonSuggestions = [
+    "Can you recommend songs from Adele?",
+    "มีเพลงอะไรของ Adele น่าฟังบ้าง",
+    "ขอเนื้อเพลง ขี้หึงของ Silly Fools",
+    "ที่เป็นไปน่ะเป็นไปด้วยรัก แต่อาจจะขี้หึงเกินไป แต่ใจทั้งใจมีแต่เธอคนเดียว คือเพลงอะไร",
+  ];
+
+  // Updated suggestions object to use the same suggestions for all modes
+  const suggestions: Record<string, string[]> = {
+    fun: commonSuggestions,
+    mentor: commonSuggestions,
+    buddy: commonSuggestions,
+  };
 
   // Focus input when component loads
   useEffect(() => {
@@ -203,6 +218,11 @@ const HomePage: React.FC = () => {
     setInitialMessage("");
     setIsSubmitting(false);
     isNavigatingRef.current = false;
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setInitialMessage(suggestion);
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
@@ -338,6 +358,34 @@ const HomePage: React.FC = () => {
                 className="min-h-24 resize-none text-lg mb-4 p-4 rounded-lg border-gray-200 focus:ring-indigo-500 focus:border-indigo-500"
                 rows={3}
               />
+
+              {/* Suggestions */}
+              <AnimatePresence>
+                {showSuggestions && (
+                  <motion.div
+                    className="mb-4"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <p className="text-sm text-gray-500 mb-2">Try asking:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestions[currentMode].map((suggestion, index) => (
+                        <motion.button
+                          key={index}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="text-sm py-1 px-3 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          {suggestion}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div className="flex justify-between items-center">
                 <Button
