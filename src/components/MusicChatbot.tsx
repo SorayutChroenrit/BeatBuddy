@@ -180,11 +180,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         !initialMessageProcessed &&
         !apiCallInProgress
       ) {
-        console.log(
-          "DIRECT HANDLER: Processing initial message:",
-          initialUserMessage
-        );
-
         // Mark as processed
         setInitialMessageProcessed(true);
         lastSentMessageRef.current = initialUserMessage;
@@ -206,13 +201,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           setIsTyping(true);
           setApiCallInProgress(true);
 
-          console.log("DIRECT API CALL with:", {
-            message: initialUserMessage,
-            mode: currentMode,
-            sessionId: selectedSessionId || sessionId,
-            userId: user?.id || userId,
-          });
-
           apiCallAttemptsRef.current += 1;
 
           const response = await sendMessageMutation.mutateAsync({
@@ -223,27 +211,23 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           });
 
           if (isMountedRef.current) {
-            console.log("DIRECT API SUCCESS:", response);
-
-            // Add bot response
+            // Add bot response with typing effect
             const botMessageId = `bot-direct-${Date.now()}`;
             const botMessage: Message = {
               id: botMessageId,
               content: response.response,
               sender: "bot",
               timestamp: new Date(),
-              complete: false,
+              complete: false, // Start as incomplete to allow typing effect
             };
 
             setMessages((prev) => [...prev, botMessage]);
             setDisplayedContents((prev) => ({
               ...prev,
-              [botMessageId]: "",
+              [botMessageId]: "", // Start with empty string for typing effect
             }));
           }
         } catch (error) {
-          console.error("DIRECT API ERROR:", error);
-
           if (isMountedRef.current) {
             // Add error message
             const errorMessageId = `error-direct-${Date.now()}`;
@@ -302,7 +286,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     setLoading(true);
 
     try {
-      console.log("Processing session data for ID:", id);
       const data = sessionData.length > 0 ? sessionData : sessionDataFromQuery;
 
       if (Array.isArray(data) && data.length > 0) {
@@ -363,9 +346,11 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
               content: item.response,
               sender: "bot" as const,
               timestamp: new Date(item.created_at),
-              complete: true,
+              complete: true, // Historical messages are complete
             };
             formattedMessages.push(botMsg);
+
+            // Make sure to set the full content for completed historical messages
             newDisplayedContents[botMsgId] = botMsg.content;
           }
         });
@@ -378,7 +363,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         }
       }
     } catch (error) {
-      console.error("Error processing session data:", error);
+      // Handle error silently
     } finally {
       setLoading(false);
     }
@@ -392,16 +377,12 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     user_id: string
   ) => {
     if (apiCallInProgress) {
-      console.warn("API call already in progress, cannot send:", message);
       return;
     }
 
     setIsTyping(true);
     setApiCallInProgress(true);
     apiCallAttemptsRef.current += 1;
-    console.log(
-      `Sending message to API: "${message}" with mode: ${mode}, session: ${session}, attempt: ${apiCallAttemptsRef.current}`
-    );
 
     try {
       const response = await sendMessageMutation.mutateAsync({
@@ -411,44 +392,50 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
         user_id: user_id,
       });
 
-      console.log("Got API response for message:", message);
-      console.log("Response content:", response.response);
+      if (isMountedRef.current) {
+        const botMessageId = `bot-${Date.now()}`;
 
-      const botMessageId = `bot-${Date.now()}`;
-      const botMessage: Message = {
-        id: botMessageId,
-        content: response.response,
-        sender: "bot",
-        timestamp: new Date(),
-        complete: false,
-      };
+        // Create bot message and explicitly mark as incomplete
+        const botMessage: Message = {
+          id: botMessageId,
+          content: response.response,
+          sender: "bot",
+          timestamp: new Date(),
+          complete: false, // Always start as false to enable typing effect
+        };
 
-      setMessages((prevMessages) => [...prevMessages, botMessage]);
-      setDisplayedContents((prev) => ({
-        ...prev,
-        [botMessageId]: "",
-      }));
+        // Add the message to the messages array
+        setMessages((prevMessages) => [...prevMessages, botMessage]);
+
+        // Initialize the displayed content as an empty string
+        setDisplayedContents((prev) => ({
+          ...prev,
+          [botMessageId]: "",
+        }));
+      }
     } catch (error) {
-      console.error(`Error in chat flow for message "${message}":`, error);
+      if (isMountedRef.current) {
+        const errorMessageId = `error-${Date.now()}`;
+        const errorMessage: Message = {
+          id: errorMessageId,
+          content:
+            "Sorry, I encountered an error while processing your request. Please try again.",
+          sender: "bot",
+          timestamp: new Date(),
+          complete: true, // Error messages can be complete immediately
+        };
 
-      const errorMessageId = `error-${Date.now()}`;
-      const errorMessage: Message = {
-        id: errorMessageId,
-        content:
-          "Sorry, I encountered an error while processing your request. Please try again.",
-        sender: "bot",
-        timestamp: new Date(),
-        complete: true,
-      };
-
-      setMessages((prevMessages) => [...prevMessages, errorMessage]);
-      setDisplayedContents((prev) => ({
-        ...prev,
-        [errorMessageId]: errorMessage.content,
-      }));
+        setMessages((prevMessages) => [...prevMessages, errorMessage]);
+        setDisplayedContents((prev) => ({
+          ...prev,
+          [errorMessageId]: errorMessage.content,
+        }));
+      }
     } finally {
-      setIsTyping(false);
-      setApiCallInProgress(false);
+      if (isMountedRef.current) {
+        setIsTyping(false);
+        setApiCallInProgress(false);
+      }
     }
   };
 
@@ -505,7 +492,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
   };
 
-  // Typing effect
+  // REVISED: Typing effect that properly types until the end
   useEffect(() => {
     // Find the latest bot message that isn't complete
     const incompleteMessage = messages.find(
@@ -533,7 +520,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
         return () => clearTimeout(timer);
       } else {
-        // Message is complete, mark it as such
+        // Message is complete, mark it as such ONLY when typing is finished
         setMessages((prevMessages) =>
           prevMessages.map((msg) =>
             msg.id === incompleteMessage.id ? { ...msg, complete: true } : msg
