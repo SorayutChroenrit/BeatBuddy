@@ -188,7 +188,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => handleModeChange("mentor")}
               >
                 <BookOpen className="mr-2 h-4 w-4" />
-                Mentor Mode
+                Expert Mode
               </Button>
 
               {/* Buddy Mode Button */}

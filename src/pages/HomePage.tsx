@@ -219,7 +219,7 @@ const HomePage: React.FC = () => {
               />
               <ModeCard
                 mode="mentor"
-                title="Mentor Mode"
+                title="Expert Mode"
                 description="Receive technical advice and learning resources"
                 colorClasses="ring-blue-400"
                 onClick={() => handleModeSelect("mentor")}
