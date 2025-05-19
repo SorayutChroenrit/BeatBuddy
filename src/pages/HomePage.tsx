@@ -324,7 +324,7 @@ const HomePage: React.FC = () => {
               >
                 <Music className="h-8 w-8 text-white" />
               </motion.div>
-              <h1 className="text-3xl font-bold text-gray-800">BeatBudd</h1>
+              <h1 className="text-3xl font-bold text-gray-800">BeatBuddy</h1>
             </motion.div>
 
             {/* Welcome Message */}
