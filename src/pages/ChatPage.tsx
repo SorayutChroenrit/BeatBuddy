@@ -23,7 +23,7 @@ const ChatPage: React.FC = () => {
   const { data: sessionData = [], isLoading: loading } =
     useSessionData(sessionId);
 
-  // CRITICAL FIX: Check for initial message and update mode from localStorage
+  // Check for initial message and update mode from localStorage - CRITICAL FIX
   useEffect(() => {
     if (sessionId && !initialMessageLoaded) {
       // Try to get initial message from localStorage

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   ArrowRight,
   Music,
@@ -7,6 +7,7 @@ import {
   Heart,
   History,
   Plus,
+  MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +15,29 @@ import { v4 as uuidv4 } from "uuid";
 import Sidebar from "../components/Sidebar";
 import { Textarea } from "../components/ui/textarea";
 import { Button } from "../components/ui/button";
+import { useChatHistory } from "../hooks/api/use-chat-api";
+import { useAuth } from "../lib/auth";
+import { Skeleton } from "../components/ui/skeleton";
+
+// Define interface for chat session
+interface SessionData {
+  id: string;
+  title: string;
+  lastMessage: string;
+  lastMessageDate: Date;
+  mode: string;
+  formattedDate: string;
+}
+
+// Props for mode card component
+interface ModeCardProps {
+  mode: "fun" | "mentor" | "buddy";
+  title: string;
+  description: string;
+  colorClasses: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -25,23 +49,100 @@ const HomePage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isNavigatingRef = useRef(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const { user } = useAuth();
+
+  // Format date for display
+  const formatDate = (date: Date): string => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return `Today at ${date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      })}`;
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return `Yesterday at ${date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      })}`;
+    } else {
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+  };
+
+  // Get abbreviated chat text for display
+  const getShortText = (text: string, maxLength = 25): string => {
+    if (!text) return "";
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
+  };
+
+  // Fetch chat history using the API
+  const { data: chatHistoryData = [], isLoading: isLoadingHistory } =
+    useChatHistory(user?.id || "");
+
+  // Process chat history data into sessions
+  const recentChatSessions = useMemo(() => {
+    if (!chatHistoryData.length) return [];
+
+    const sessionsMap = new Map<string, SessionData>();
+
+    chatHistoryData.forEach((msg) => {
+      if (!sessionsMap.has(msg.session_id)) {
+        const sessionDate = new Date(msg.created_at);
+
+        sessionsMap.set(msg.session_id, {
+          id: msg.session_id,
+          title: msg.query,
+          lastMessage: msg.query,
+          lastMessageDate: sessionDate,
+          mode: msg.mode,
+          formattedDate: formatDate(sessionDate),
+        });
+      } else {
+        const existingSession = sessionsMap.get(msg.session_id);
+        const msgDate = new Date(msg.created_at);
+
+        if (existingSession && msgDate > existingSession.lastMessageDate) {
+          existingSession.lastMessage = msg.query;
+          existingSession.lastMessageDate = msgDate;
+          existingSession.formattedDate = formatDate(msgDate);
+          sessionsMap.set(msg.session_id, existingSession);
+        }
+      }
+    });
+
+    return Array.from(sessionsMap.values())
+      .sort((a, b) => b.lastMessageDate.getTime() - a.lastMessageDate.getTime())
+      .slice(0, 3); // Get only the 3 most recent sessions
+  }, [chatHistoryData, formatDate]);
 
   // Example suggestions based on mode
-  const suggestions = {
+  const suggestions: Record<string, string[]> = {
     fun: [
-      "Tell me a fun fact about The Beatles",
-      "What's the most sampled song in history?",
-      "Recommend me some interesting music from the 80s",
+      "Can you recommend songs from Adele?",
+      "มีเพลงอะไรของ Adele น่าฟังบ้าง",
+      "ขอเนื้อเพลง ขี้หึงของ Silly Fools",
+      "ที่เป็นไปน่ะเป็นไปด้วยรัก แต่อาจจะขี้หึงเกินไป แต่ใจทั้งใจมีแต่เธอคนเดียว คือเพลงอะไร",
     ],
     mentor: [
-      "Help me understand chord progressions",
-      "What scales should I practice as a beginner?",
-      "How do I improve my music theory knowledge?",
+      "What are some jazz scales I should learn?",
+      "แนะนำวิธีการฝึกซ้อมกีตาร์ให้เก่งขึ้น",
+      "How do major and minor scales differ?",
+      "บันไดเสียงที่ใช้ในเพลงแจ๊สมีอะไรบ้าง",
     ],
     buddy: [
-      "I'm feeling stuck with my practice routine",
-      "How do I stay motivated to practice?",
-      "Give me some encouraging music quotes",
+      "Recommend some songs for a workout playlist",
+      "ขอเพลงฟังสบายๆ ตอนทำงาน",
+      "Songs to help me through a breakup",
+      "เพลงไทยที่ฟังแล้วให้กำลังใจตัวเอง",
     ],
   };
 
@@ -134,20 +235,13 @@ const HomePage: React.FC = () => {
   };
 
   // Mode card component
-  const ModeCard = ({
+  const ModeCard: React.FC<ModeCardProps> = ({
     mode,
     title,
     description,
     colorClasses,
     icon,
     onClick,
-  }: {
-    mode: "fun" | "mentor" | "buddy";
-    title: string;
-    description: string;
-    colorClasses: string;
-    icon: React.ReactNode;
-    onClick: () => void;
   }) => (
     <motion.button
       onClick={onClick}
@@ -353,7 +447,7 @@ const HomePage: React.FC = () => {
               <ModeCard
                 mode="fun"
                 title="Fun Mode"
-                description="Get lyrics and fun facts about your favorite music"
+                description="Just chat and have fun talking about music"
                 colorClasses="ring-purple-400"
                 icon={<Sparkles className="h-5 w-5 text-purple-500" />}
                 onClick={() => handleModeSelect("fun")}
@@ -361,7 +455,7 @@ const HomePage: React.FC = () => {
               <ModeCard
                 mode="mentor"
                 title="Expert Mode"
-                description="Identify songs and get detailed musical knowledge"
+                description="Chat with a music expert for detailed knowledge"
                 colorClasses="ring-blue-400"
                 icon={<Book className="h-5 w-5 text-blue-500" />}
                 onClick={() => handleModeSelect("mentor")}
@@ -369,35 +463,64 @@ const HomePage: React.FC = () => {
               <ModeCard
                 mode="buddy"
                 title="Buddy Mode"
-                description="Get recommendations and build your musical journey"
+                description="Talk with a music buddy who understands you"
                 colorClasses="ring-green-400"
                 icon={<Heart className="h-5 w-5 text-green-500" />}
                 onClick={() => handleModeSelect("buddy")}
               />
             </motion.div>
 
-            {/* Recent Chats */}
+            {/* Recent Chats - Updated to use API */}
             <motion.div className="w-full mt-8" variants={itemVariants}>
               <h3 className="font-medium text-gray-700 mb-3 flex items-center">
                 <History className="h-4 w-4 mr-2" />
                 Continue a recent conversation
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <motion.button
-                    key={index}
-                    className="p-3 bg-white rounded-lg border border-gray-200 text-left hover:bg-gray-50 hover:border-indigo-200 transition-colors"
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <p className="text-sm font-medium text-gray-700 truncate">
-                      About jazz improvisation
+                {isLoadingHistory ? (
+                  // Show skeleton loaders when loading
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <Skeleton
+                      key={index}
+                      className="h-16 w-full rounded-lg bg-gray-100"
+                    />
+                  ))
+                ) : recentChatSessions.length > 0 ? (
+                  // Show recent chat sessions from API
+                  recentChatSessions.map((session) => (
+                    <motion.button
+                      key={session.id}
+                      className="p-3 bg-white rounded-lg border border-gray-200 text-left hover:bg-gray-50 hover:border-indigo-200 transition-colors"
+                      whileHover={{ scale: 1.02, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleSessionSelect(session.id)}
+                    >
+                      <p className="text-sm font-medium text-gray-700 truncate">
+                        {getShortText(session.title)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {session.formattedDate}
+                      </p>
+                    </motion.button>
+                  ))
+                ) : user ? (
+                  // No chat history yet
+                  <div className="col-span-3 text-center py-4 bg-white rounded-lg border border-gray-200">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm text-gray-500">No chat history yet</p>
+                    <p className="text-xs text-gray-400">
+                      Start a new chat to see it here
                     </p>
-                    <p className="text-xs text-gray-500">
-                      Yesterday at 3:24 PM
+                  </div>
+                ) : (
+                  // User not logged in
+                  <div className="col-span-3 text-center py-4 bg-white rounded-lg border border-gray-200">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm text-gray-500">
+                      Sign in to see your chat history
                     </p>
-                  </motion.button>
-                ))}
+                  </div>
+                )}
                 <motion.button
                   className="p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-left hover:bg-indigo-100 transition-colors flex items-center justify-center"
                   whileHover={{ scale: 1.02, y: -2 }}
