@@ -31,11 +31,6 @@ const ChatPage: React.FC = () => {
         `chat_initial_message_${sessionId}`
       );
       const storedMode = localStorage.getItem(`chat_initial_mode_${sessionId}`);
-
-      // Debug
-      console.log("Found stored message:", storedInitialMessage);
-      console.log("Found stored mode:", storedMode);
-
       // If we have an initial message, process it
       if (storedInitialMessage && storedInitialMessage.trim() !== "") {
         setInitialUserMessage(storedInitialMessage);
@@ -116,16 +111,6 @@ const ChatPage: React.FC = () => {
       navigate("/login");
     }
   }, [user, navigate]);
-
-  // Debug what's being passed to MusicChatbot
-  useEffect(() => {
-    console.log(
-      "Passing to MusicChatbot - initialUserMessage:",
-      initialUserMessage
-    );
-    console.log("Passing to MusicChatbot - mode:", currentMode);
-    console.log("Passing to MusicChatbot - sessionId:", sessionId);
-  }, [initialUserMessage, currentMode, sessionId]);
 
   return (
     <div className="flex h-screen">

@@ -68,6 +68,25 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   const lastSentMessageRef = useRef("");
   const apiCallAttemptsRef = useRef(0);
 
+  // For the improved typing effect
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [forceUpdate, setForceUpdate] = useState<number>(0);
+
+  // This function forces the typing effect to continue
+  const forceTypingContinuation = () => {
+    setForceUpdate((prev) => prev + 1);
+  };
+
+  // Add this effect to clean up typing timers when component unmounts
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // Generate a session ID for this chat
   const [sessionId, setSessionId] = useState<string>(propSessionId || uuidv4());
   const [userId] = useState<string>(() => {
@@ -170,7 +189,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     messages.length,
   ]);
 
-  // Function to create a bot message with forced typing
+  // IMPROVED: Function to create a bot message with forced typing
   const createBotMessageWithTyping = (
     content: string,
     messageId: string = `bot-${Date.now()}`
@@ -192,6 +211,9 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       ...prev,
       [messageId]: "",
     }));
+
+    // Force the typing to start immediately
+    forceTypingContinuation();
 
     return messageId;
   };
@@ -361,7 +383,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
               content: item.response,
               sender: "bot" as const,
               timestamp: new Date(item.created_at),
-              complete: true,
+              complete: true, // Historical messages are complete
             };
             formattedMessages.push(botMsg);
 
@@ -384,6 +406,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     }
   };
 
+  // CRITICAL FIX: Updated function for sending messages to API with better typing control
   const sendMessageToAPI = async (
     message: string,
     mode: BotMode,
@@ -488,51 +511,50 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
   };
 
-  // REVISED: Improved typing effect that properly types until the end
+  // IMPROVED: Typing effect with force update and timer management
   useEffect(() => {
-    // Find all incomplete bot messages
-    const incompleteMessages = messages.filter(
+    // Clear any existing typing timer when component updates
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+
+    // Find the first incomplete bot message
+    const incompleteMessage = messages.find(
       (msg) => msg.sender === "bot" && msg.complete === false
     );
 
-    // Process only one message at a time - the oldest incomplete message
-    const incompleteMessage =
-      incompleteMessages.length > 0
-        ? incompleteMessages.sort(
-            (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-          )[0]
-        : null;
+    if (!incompleteMessage) return;
 
-    if (incompleteMessage) {
-      // Get the current displayed content or initialize it
-      const currentContent = displayedContents[incompleteMessage.id] || "";
+    // Get current displayed content or initialize
+    const currentContent = displayedContents[incompleteMessage.id] || "";
+    const fullContent = incompleteMessage.content;
 
-      // If we haven't displayed the full message yet
-      if (currentContent.length < incompleteMessage.content.length) {
-        // Set a timeout to add the next character
-        const timer = setTimeout(() => {
-          // Add the next character
-          const nextChar = incompleteMessage.content[currentContent.length];
-          const newContent = currentContent + nextChar;
+    // If we haven't displayed the full message yet
+    if (currentContent.length < fullContent.length) {
+      // Only add one character at a time
+      const nextChar = fullContent[currentContent.length];
+      const newContent = currentContent + nextChar;
 
-          // Update the displayed content for this message
-          setDisplayedContents((prev) => ({
-            ...prev,
-            [incompleteMessage.id]: newContent,
-          }));
-        }, 15); // Adjust typing speed (milliseconds per character)
+      // Update the displayed content
+      setDisplayedContents((prev) => ({
+        ...prev,
+        [incompleteMessage.id]: newContent,
+      }));
 
-        return () => clearTimeout(timer);
-      } else {
-        // Message is complete, mark it as such ONLY when typing is finished
-        setMessages((prevMessages) =>
-          prevMessages.map((msg) =>
-            msg.id === incompleteMessage.id ? { ...msg, complete: true } : msg
-          )
-        );
-      }
+      // Set a timer to force continuation after a delay
+      typingTimerRef.current = setTimeout(() => {
+        forceTypingContinuation();
+      }, 15); // Adjust typing speed (milliseconds per character)
+    } else if (currentContent.length >= fullContent.length) {
+      // Mark message as complete once fully typed
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === incompleteMessage.id ? { ...msg, complete: true } : msg
+        )
+      );
     }
-  }, [messages, displayedContents]);
+  }, [messages, displayedContents, forceUpdate]);
 
   // Auto-scroll to bottom when new messages come in
   useEffect(() => {
