@@ -6,10 +6,9 @@ import {
   Book,
   Heart,
   History,
-  Plus,
   MessageSquare,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import Sidebar from "../components/Sidebar";
@@ -121,30 +120,8 @@ const HomePage: React.FC = () => {
 
     return Array.from(sessionsMap.values())
       .sort((a, b) => b.lastMessageDate.getTime() - a.lastMessageDate.getTime())
-      .slice(0, 3); // Get only the 3 most recent sessions
+      .slice(0, 3);
   }, [chatHistoryData, formatDate]);
-
-  // Example suggestions based on mode
-  const suggestions: Record<string, string[]> = {
-    fun: [
-      "Can you recommend songs from Adele?",
-      "มีเพลงอะไรของ Adele น่าฟังบ้าง",
-      "ขอเนื้อเพลง ขี้หึงของ Silly Fools",
-      "ที่เป็นไปน่ะเป็นไปด้วยรัก แต่อาจจะขี้หึงเกินไป แต่ใจทั้งใจมีแต่เธอคนเดียว คือเพลงอะไร",
-    ],
-    mentor: [
-      "What are some jazz scales I should learn?",
-      "แนะนำวิธีการฝึกซ้อมกีตาร์ให้เก่งขึ้น",
-      "How do major and minor scales differ?",
-      "บันไดเสียงที่ใช้ในเพลงแจ๊สมีอะไรบ้าง",
-    ],
-    buddy: [
-      "Recommend some songs for a workout playlist",
-      "ขอเพลงฟังสบายๆ ตอนทำงาน",
-      "Songs to help me through a breakup",
-      "เพลงไทยที่ฟังแล้วให้กำลังใจตัวเอง",
-    ],
-  };
 
   // Focus input when component loads
   useEffect(() => {
@@ -226,11 +203,6 @@ const HomePage: React.FC = () => {
     setInitialMessage("");
     setIsSubmitting(false);
     isNavigatingRef.current = false;
-    setTimeout(() => inputRef.current?.focus(), 0);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setInitialMessage(suggestion);
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
@@ -367,34 +339,6 @@ const HomePage: React.FC = () => {
                 rows={3}
               />
 
-              {/* Suggestions */}
-              <AnimatePresence>
-                {showSuggestions && (
-                  <motion.div
-                    className="mb-4"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <p className="text-sm text-gray-500 mb-2">Try asking:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {suggestions[currentMode].map((suggestion, index) => (
-                        <motion.button
-                          key={index}
-                          onClick={() => handleSuggestionClick(suggestion)}
-                          className="text-sm py-1 px-3 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          {suggestion}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               <div className="flex justify-between items-center">
                 <Button
                   onClick={() => setShowSuggestions(!showSuggestions)}
@@ -521,17 +465,6 @@ const HomePage: React.FC = () => {
                     </p>
                   </div>
                 )}
-                <motion.button
-                  className="p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-left hover:bg-indigo-100 transition-colors flex items-center justify-center"
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleNewChat}
-                >
-                  <Plus className="h-4 w-4 mr-2 text-indigo-600" />
-                  <span className="text-sm font-medium text-indigo-600">
-                    New Chat
-                  </span>
-                </motion.button>
               </div>
             </motion.div>
           </div>
