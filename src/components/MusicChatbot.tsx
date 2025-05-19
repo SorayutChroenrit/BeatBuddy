@@ -150,7 +150,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       const initialMessage: Message = {
         id: "initial",
         content:
-          "👋 Hi there! I'm your music companion. How can I help you today?",
+          "🎵 **Hello there!** I'm BeatBuddy, your AI music assistant. Whether you need song recommendations, lyrics help, or music knowledge, I'm here to help. What's your musical question today?",
         sender: "bot",
         timestamp: new Date(),
         complete: true,
@@ -328,7 +328,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
           const initialMessage = {
             id: initialMessageId,
             content:
-              "👋 Hi there! I'm your music companion. How can I help you today?",
+              "🎵 **Hello there!** I'm BeatBuddy, your AI music assistant. Whether you need song recommendations, lyrics help, or music knowledge, I'm here to help. What's your musical question today?",
             sender: "bot" as const,
             timestamp: new Date(),
             complete: true,
