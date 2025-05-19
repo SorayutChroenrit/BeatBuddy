@@ -450,12 +450,13 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
   const handleSendMessage = async (customMessage?: string) => {
     const messageToSend = customMessage || inputValue;
 
-    // Return early if conditions are not met
+    // Return early if message is empty
     if (messageToSend.trim() === "") {
       console.log("Empty message, not sending");
       return;
     }
 
+    // Don't send if bot is currently typing or API call is in progress
     if (isTyping || apiCallInProgress) {
       console.log("Typing or API call in progress, not sending");
       return;
@@ -464,19 +465,10 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     const messageId = `msg-${Date.now()}`;
     const userMessageId = `user-${messageId}`;
 
-    // Check for duplicates
-    const isDuplicate = messages.some(
-      (msg) =>
-        msg.sender === "user" &&
-        msg.content === messageToSend &&
-        Date.now() - msg.timestamp.getTime() < 5000
-    );
+    // REMOVED: The duplicate message check
+    // This allows users to send the same message multiple times
 
-    if (messageToSend === lastSentMessageRef.current || isDuplicate) {
-      console.log("Duplicate message detected, not sending");
-      return;
-    }
-
+    // Update lastSentMessageRef for debugging purposes only
     lastSentMessageRef.current = messageToSend;
 
     // Add user message if not already shown
@@ -533,24 +525,39 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
       if (currentContent.length < fullContent.length) {
         // Set a timeout to add the next character
         const timer = setTimeout(() => {
-          // Add the next character
-          const nextChar = fullContent[currentContent.length];
-          const newContent = currentContent + nextChar;
+          // Calculate how many characters to add (speed up for long messages)
+          // For very long messages, increase the typing speed
+          const messageLength = fullContent.length;
+          let charsToAdd = 1;
+
+          // Speed up typing for longer messages
+          if (messageLength > 500) {
+            charsToAdd = Math.ceil(messageLength / 100); // Add more chars at once for long messages
+          }
+
+          // Make sure we don't exceed the message length
+          const endIndex = Math.min(
+            currentContent.length + charsToAdd,
+            fullContent.length
+          );
+          const newContent = fullContent.substring(0, endIndex);
 
           // Update the displayed content for this message
           setDisplayedContents((prev) => ({
             ...prev,
             [incompleteMessage.id]: newContent,
           }));
-        }, 15); // Adjust typing speed (milliseconds per character)
+        }, 15); // Adjust typing speed (milliseconds per character chunk)
 
         return () => clearTimeout(timer);
       } else {
-        // IMPORTANT: Only mark as complete after fully typed
+        // IMPORTANT: Mark as complete after fully typed
         console.log(
           "Message fully typed, marking as complete:",
           incompleteMessage.id
         );
+
+        // Important: Mark the message as complete after typing is done
         setMessages((prevMessages) =>
           prevMessages.map((msg) =>
             msg.id === incompleteMessage.id ? { ...msg, complete: true } : msg
@@ -597,16 +604,6 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
   // Check if we should show the image or fallback
   const shouldShowFallback = imageError || !imageUrl;
-
-  // Debug logging for component state
-  useEffect(() => {
-    console.log("Component state:", {
-      isTyping,
-      apiCallInProgress,
-      messagesCount: messages.length,
-      incompleteMessages: messages.filter((msg) => !msg.complete).length,
-    });
-  }, [isTyping, apiCallInProgress, messages]);
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
