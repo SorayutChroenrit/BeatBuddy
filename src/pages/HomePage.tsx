@@ -172,26 +172,7 @@ const modeCardVariants: Variants = {
   },
 };
 
-const activeCardVariants: Variants = {
-  active: {
-    scale: 1.02,
-    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)",
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 30,
-    },
-  },
-  inactive: {
-    scale: 1,
-    boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 30,
-    },
-  },
-};
+// Removed activeCardVariants since we're using CSS-only approach
 
 const chatSessionVariants: Variants = {
   hidden: {
@@ -397,7 +378,7 @@ const HomePage: React.FC = () => {
         handleStartChat();
       }
     },
-    []
+    [initialMessage, isSubmitting, currentMode, navigate]
   );
 
   // Chat initiation handler
@@ -481,19 +462,16 @@ const HomePage: React.FC = () => {
       className="text-left w-full focus:outline-none"
       variants={modeCardVariants}
       custom={index}
-      whileHover="hover"
+      whileHover={!isActive ? "hover" : undefined} // Only hover effect when not active
       whileTap="tap"
-      layout
+      layout={false} // Disable layout animation to prevent re-animations
     >
-      <motion.div
+      <div
         className={`bg-white p-5 rounded-xl border transition-all duration-300 ${
           isActive
-            ? `ring-2 ${colorClasses} shadow-lg border-transparent`
-            : `border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md`
+            ? `ring-2 ${colorClasses} shadow-lg border-transparent transform scale-[1.02]`
+            : `border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md hover:scale-105 hover:-translate-y-1`
         }`}
-        variants={activeCardVariants}
-        animate={isActive ? "active" : "inactive"}
-        layout
       >
         <div className="flex items-start gap-3">
           <motion.div
@@ -506,20 +484,19 @@ const HomePage: React.FC = () => {
             {icon}
           </motion.div>
           <div className="flex-1">
-            <motion.h3
+            <h3
               className={`font-semibold text-lg mb-1 ${colorClasses
                 .replace("ring-", "text-")
                 .replace("400", "600")}`}
-              layout
             >
               {title}
-            </motion.h3>
-            <motion.p className="text-gray-600 text-sm leading-relaxed" layout>
+            </h3>
+            <p className="text-gray-600 text-sm leading-relaxed">
               {description}
-            </motion.p>
+            </p>
           </div>
         </div>
-      </motion.div>
+      </div>
     </motion.button>
   );
 
@@ -719,7 +696,6 @@ const HomePage: React.FC = () => {
             <motion.div
               className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full"
               variants={itemVariants}
-              layout
             >
               <ModeCard
                 mode="fun"
@@ -754,7 +730,7 @@ const HomePage: React.FC = () => {
             </motion.div>
 
             {/* Recent Chats */}
-            <motion.div className="w-full mt-8" variants={itemVariants} layout>
+            <motion.div className="w-full mt-8" variants={itemVariants}>
               <motion.h3
                 className="font-medium text-gray-700 mb-3 flex items-center"
                 initial={{ opacity: 0, x: -20 }}
@@ -792,7 +768,6 @@ const HomePage: React.FC = () => {
                           whileHover="hover"
                           whileTap="tap"
                           onClick={() => handleSessionSelect(session.id)}
-                          layout
                         >
                           <p className="text-sm font-medium text-gray-700 truncate">
                             {getShortText(session.title)}
