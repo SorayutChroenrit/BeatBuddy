@@ -493,6 +493,7 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
     );
   };
 
+  // Claude-like typing effect - Character by character with natural pauses
   useEffect(() => {
     // Find all incomplete bot messages
     const incompleteMessages = messages.filter(
@@ -514,49 +515,47 @@ const MusicChatbot: React.FC<MusicChatbotProps> = ({
 
       // If we haven't displayed the full message yet
       if (currentContent.length < fullContent.length) {
-        // Set a timeout to add characters
-        const timer = setTimeout(() => {
-          // Calculate how many characters to add based on message length and progress
-          // This makes short messages type at a reasonable pace and long messages go faster
+        // Get the next character to display
+        const nextChar = fullContent[currentContent.length];
 
-          // Get total message length
-          const totalLength = fullContent.length;
+        // Calculate typing speed based on character type for natural feel
+        let typingDelay = 25; // Base speed - very fast like Claude
 
-          // Base number of characters to add per tick
-          let charsToAdd = 1;
+        // Natural pauses for punctuation
+        if (
+          currentContent.endsWith(".") ||
+          currentContent.endsWith("!") ||
+          currentContent.endsWith("?")
+        ) {
+          typingDelay = 300; // Longer pause after sentences
+        } else if (
+          currentContent.endsWith(",") ||
+          currentContent.endsWith(";") ||
+          currentContent.endsWith(":")
+        ) {
+          typingDelay = 150; // Medium pause after commas/semicolons
+        } else if (nextChar === " ") {
+          typingDelay = 40; // Slightly faster for spaces
+        } else if (nextChar === "\n") {
+          typingDelay = 200; // Pause for line breaks
+        } else if (/[a-zA-Z0-9]/.test(nextChar)) {
+          // Regular characters - add small random variation for natural feel
+          typingDelay = 25 + Math.random() * 15; // 25-40ms
+        }
 
-          // For longer messages, increase typing speed
-          if (totalLength > 200) {
-            // For very long messages, add more characters at once
-            // This formula adds more characters as the message gets longer
-            charsToAdd = Math.max(1, Math.floor(totalLength / 100));
-
-            // Further increase speed as we progress through the message
-            // This creates a ramp-up effect where typing gets faster as it goes
-            if (currentContent.length > totalLength * 0.3) {
-              charsToAdd = Math.max(charsToAdd, Math.floor(totalLength / 80));
-            }
-          }
-
-          // Make sure we don't exceed the message length
-          const endIndex = Math.min(
-            currentContent.length + charsToAdd,
-            fullContent.length
+        const timeoutId = setTimeout(() => {
+          const newContent = fullContent.substring(
+            0,
+            currentContent.length + 1
           );
 
-          // Get the next chunk of text to add
-          const newContent = fullContent.substring(0, endIndex);
-
-          // Update the displayed content for this message
           setDisplayedContents((prev) => ({
             ...prev,
             [incompleteMessage.id]: newContent,
           }));
+        }, typingDelay);
 
-          // Base speed of 30ms per update with small random variation
-        }, 30 + Math.random() * 5); // 30-35ms per update
-
-        return () => clearTimeout(timer);
+        return () => clearTimeout(timeoutId);
       } else {
         // Mark as complete after fully typed
         console.log(
