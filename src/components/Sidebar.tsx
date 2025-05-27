@@ -118,9 +118,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleNewChat = () => {
     if (onNewChat) {
       onNewChat();
-    } else {
-      navigate("/");
     }
+    navigate("/");
   };
 
   // Handle session selection
