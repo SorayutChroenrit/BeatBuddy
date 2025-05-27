@@ -734,7 +734,7 @@ const HomePage: React.FC = () => {
               <ModeCard
                 mode="mentor"
                 title="Expert Mode"
-                description="Chat with a music expert for detailed knowledge"
+                description="Music expert for detailed knowledge"
                 colorClasses="ring-blue-400"
                 icon={<Book className="h-5 w-5 text-blue-500" />}
                 onClick={() => handleModeSelect("mentor")}
@@ -744,7 +744,7 @@ const HomePage: React.FC = () => {
               <ModeCard
                 mode="buddy"
                 title="Buddy Mode"
-                description="Talk with a music buddy who understands you"
+                description="Music buddy who understands you"
                 colorClasses="ring-green-400"
                 icon={<Heart className="h-5 w-5 text-green-500" />}
                 onClick={() => handleModeSelect("buddy")}
