@@ -631,13 +631,13 @@ const HomePage: React.FC = () => {
                     >
                       Try asking:
                     </motion.p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {suggestions[currentMode].map(
                         (suggestion: string, index: number) => (
                           <motion.button
                             key={`${currentMode}-${index}`}
                             onClick={() => handleSuggestionClick(suggestion)}
-                            className="text-sm py-2 px-3 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors border border-indigo-200"
+                            className="text-xs py-1.5 px-2.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors border border-indigo-200 leading-tight"
                             variants={suggestionVariants}
                             custom={index}
                             initial="hidden"
